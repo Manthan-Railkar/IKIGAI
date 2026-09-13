@@ -1,0 +1,208 @@
+@import "tailwindcss";
+
+/* ── Neue Machina @font-face ─────────────────────────────────── */
+@font-face {
+  font-family: "Neue Machina";
+  src: url("/fonts/PPNeueMachina-Light.woff") format("woff");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Neue Machina";
+  src: url("/fonts/PPNeueMachina-Regular.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Neue Machina";
+  src: url("/fonts/PPNeueMachina-Ultrabold.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── Tailwind Theme ──────────────────────────────────────────── */
+@theme {
+  --color-dark: #1d2228;
+  --color-dark-footer: #1b1f24;
+  --color-grey: #878f9a;
+  --color-green: #52f3b0;
+  --color-blue: #3b4afb;
+  --color-red: #c11822;
+  --color-border: rgba(154, 82, 97, 0.3);
+  --color-border-hover: rgba(154, 82, 97, 0.7);
+  --color-white-50: rgba(255, 255, 255, 0.5);
+  --color-white-30: rgba(255, 255, 255, 0.3);
+  --color-white-60: rgba(255, 255, 255, 0.6);
+  --color-white-80: rgba(255, 255, 255, 0.8);
+
+  --font-family-machina: "Neue Machina", sans-serif;
+  --font-family-grotesque: "english-grotesque", "Neue Machina", sans-serif;
+
+  /* Custom breakpoints matching Webflow */
+  --breakpoint-xs: 480px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 992px;
+  --breakpoint-xl: 1280px;
+}
+
+/* ── Base styles ─────────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+  height: 100%;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+  outline: 0;
+}
+
+body {
+  color: #fff;
+  background-color: #1d2228;
+  font-family: "Neue Machina", sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  margin: 0;
+}
+
+/* ── Custom Scrollbar ────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: #878f9a;
+}
+::-webkit-scrollbar-track {
+  background: #1d2228;
+}
+
+/* ── Link Underline Animation ────────────────────────────────── */
+[data-anim="link"] {
+  position: relative;
+}
+[data-anim="link"]::after {
+  content: " ";
+  height: 0px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -4px;
+  background: #fff;
+  transition: all 200ms ease;
+}
+[data-anim="link"]:hover::after {
+  height: 4px;
+}
+
+/* ── Hero Button Fill Effect ─────────────────────────────────── */
+.btn-hero-fill {
+  position: relative;
+  overflow: hidden;
+}
+.btn-hero-fill::before {
+  content: " ";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  z-index: -1;
+  width: 0%;
+  transition: all 400ms ease;
+}
+.btn-hero-fill:hover::before {
+  width: 100%;
+}
+.btn-hero-fill:hover .btn-ico {
+  filter: invert(100%);
+}
+
+/* ── Dashed Border Image ─────────────────────────────────────── */
+.dash-border-bottom {
+  background-image: url("/Assets/dash.png");
+  background-position: 50% 100%;
+  background-repeat: repeat-x;
+  background-size: auto;
+}
+.dash-border-both {
+  background-image: url("/Assets/dash.png"), url("/Assets/dash.png");
+  background-position: 0 0, 50% 100%;
+  background-repeat: repeat-x, repeat-x;
+  background-size: auto, auto;
+}
+
+/* ── Noise Texture ───────────────────────────────────────────── */
+.noise-bg {
+  background-image: url("/Assets/Noise.png");
+  background-position: 0 0;
+  background-size: auto;
+}
+
+/* ── Form Submit Arrow Hover ─────────────────────────────────── */
+.form-submit-wrap:hover .overflow-anim {
+  right: -1.5rem;
+}
+
+/* ── Entrance Animation Utilities ────────────────────────────── */
+.animate-fade-in {
+  animation: fadeIn 0.8s ease forwards;
+}
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s ease forwards;
+}
+.animate-fade-in-left {
+  animation: fadeInLeft 0.8s ease forwards;
+}
+.animate-fade-in-right {
+  animation: fadeInRight 0.8s ease forwards;
+}
+.animate-scale-in {
+  animation: scaleIn 0.6s ease forwards;
+}
+.animate-width-in {
+  animation: widthIn 0.6s ease forwards;
+}
+.animate-height-in {
+  animation: heightIn 0.6s ease forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(50px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeInLeft {
+  from { opacity: 0; transform: translateX(-200px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes fadeInRight {
+  from { opacity: 0; transform: translateX(100px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes scaleIn {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+@keyframes widthIn {
+  from { width: 0px; }
+  to { width: var(--target-width, 200px); }
+}
+@keyframes heightIn {
+  from { height: 0px; }
+  to { height: var(--target-height, 200px); }
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-30px); }
+  to { opacity: 1; transform: translateY(0); }
+}

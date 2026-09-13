@@ -1,0 +1,114 @@
+.scroll-stack-scroller {
+  position: relative;
+  width: 100%;
+  height: 520px;
+  overflow-y: auto;
+  overflow-x: visible;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: scroll-position;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+.scroll-stack-scroller.use-window-scroll {
+  height: auto !important;
+  min-height: 100vh;
+  overflow: visible !important;
+  overscroll-behavior: auto !important;
+}
+
+.scroll-stack-scroller.use-window-scroll .scroll-stack-inner {
+  padding: 4vh 1rem 30vh;
+  min-height: 160vh;
+  overflow: visible;
+}
+
+.scroll-stack-scroller::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scroll-stack-scroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-stack-scroller::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 9999px;
+}
+
+.scroll-stack-scroller::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.scroll-stack-inner {
+  padding: 30px 1.5rem 360px;
+  min-height: 100%;
+}
+
+.scroll-stack-card-wrapper {
+  position: relative;
+}
+
+.scroll-stack-card {
+  transform-origin: top center;
+  will-change: transform, filter;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 35px rgba(193, 24, 34, 0.25);
+  min-height: 18rem;
+  width: 100%;
+  max-width: 980px;
+  margin: 30px auto;
+  padding: 2.5rem;
+  border-radius: 28px;
+  box-sizing: border-box;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  position: relative;
+  background: radial-gradient(circle at 80% 20%, rgba(193, 24, 34, 0.25), transparent 60%), linear-gradient(135deg, rgba(28, 33, 40, 0.95) 0%, rgba(16, 19, 24, 0.98) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(20px);
+  color: #ffffff;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.scroll-stack-card:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85), 0 0 45px rgba(193, 24, 34, 0.35);
+}
+
+.scroll-stack-end {
+  width: 100%;
+  height: 1px;
+}
+
+@media (max-width: 900px) {
+  .scroll-stack-card {
+    padding: 2rem;
+    min-height: 16rem;
+    border-radius: 24px;
+    margin: 20px auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .scroll-stack-scroller {
+    height: 440px;
+  }
+  .scroll-stack-scroller.use-window-scroll .scroll-stack-inner {
+    padding: 2vh 0.5rem 20vh;
+    min-height: 130vh;
+  }
+  .scroll-stack-inner {
+    padding: 20px 0.75rem 280px;
+  }
+  .scroll-stack-card {
+    padding: 1.5rem;
+    min-height: 14rem;
+    border-radius: 20px;
+  }
+}
