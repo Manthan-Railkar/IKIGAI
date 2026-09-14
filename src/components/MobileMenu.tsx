@@ -2,18 +2,25 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { Profile } from "@/types/profile";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 
 interface MobileMenuProps {
   isOpen: boolean;
   onClose: () => void;
-  onOpenModal: () => void;
+  onOpenModal?: () => void;
+  profile?: Profile | null;
 }
 
 export default function MobileMenu({
   isOpen,
   onClose,
-  onOpenModal,
+  profile,
 }: MobileMenuProps) {
+  const router = useRouter();
+  const supabase = createClient();
+
   useEffect(() => {
     if (isOpen) {
       document.documentElement.style.overflow = "hidden";
@@ -32,9 +39,11 @@ export default function MobileMenu({
     onClose();
   };
 
-  const handleLogin = () => {
+  const handleSignOut = async () => {
     onClose();
-    onOpenModal();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
   };
 
   return (
@@ -63,7 +72,7 @@ export default function MobileMenu({
           style={{ transitionDelay: isOpen ? "200ms" : "0ms" }}
         >
           <Link
-            href="#virtual-museum"
+            href="/museums"
             onClick={handleNavClick}
             className="text-white uppercase pt-[25px] pb-[25px] no-underline dash-border-bottom"
           >
@@ -93,20 +102,39 @@ export default function MobileMenu({
         </nav>
 
         <div
-          className={`flex justify-center items-center transition-all duration-500 ${
+          className={`flex flex-col gap-3 items-center transition-all duration-500 ${
             isOpen
               ? "opacity-100 translate-y-0"
               : "opacity-0 translate-y-[50px]"
           }`}
           style={{ transitionDelay: isOpen ? "400ms" : "0ms" }}
         >
-          <Link
-            href="/login"
-            onClick={handleNavClick}
-            className="btn-hero-fill inline-block text-center tracking-[0.1em] uppercase bg-transparent border border-white-50 rounded-lg min-w-[190px] px-[30px] pt-[17px] pb-[14px] font-bold text-white no-underline cursor-pointer relative overflow-hidden transition-all duration-200 hover:border-white hover:text-black max-xs:min-w-[160px] max-xs:pt-[14px] max-xs:pb-[12px]"
-          >
-            <span>Login / Sign Up</span>
-          </Link>
+          {profile ? (
+            <>
+              <Link
+                href="/profile"
+                onClick={handleNavClick}
+                className="w-full max-w-[280px] flex items-center justify-center gap-3 py-3.5 px-4 rounded-xl border border-white/30 bg-white/5 hover:bg-white/10 transition-colors text-white font-grotesque text-sm font-bold tracking-wider uppercase no-underline text-center"
+              >
+                <span>Virtual Pass ({profile.full_name?.split(" ")[0] || "Visitor"})</span>
+              </Link>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="text-white/50 hover:text-rose-400 text-xs font-grotesque uppercase tracking-widest bg-transparent border-0 cursor-pointer pt-1 transition-colors"
+              >
+                Sign Out
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/login"
+              onClick={handleNavClick}
+              className="btn-hero-fill inline-block text-center tracking-[0.1em] uppercase bg-transparent border border-white-50 rounded-lg min-w-[190px] px-[30px] pt-[17px] pb-[14px] font-bold text-white no-underline cursor-pointer relative overflow-hidden transition-all duration-200 hover:border-white hover:text-black max-xs:min-w-[160px] max-xs:pt-[14px] max-xs:pb-[12px]"
+            >
+              <span>Login / Sign Up</span>
+            </Link>
+          )}
         </div>
       </div>
     </div>

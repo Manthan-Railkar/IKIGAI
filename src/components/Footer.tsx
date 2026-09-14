@@ -36,7 +36,23 @@ const socialLinks = [
   },
 ];
 
-export default function Footer({ onOpenModal }: FooterProps) {
+const SocialIcons = ({ className = "" }: { className?: string }) => (
+  <div className={`flex items-center gap-[22px] max-xs:gap-4 ${className}`}>
+    {socialLinks.map((link) => (
+      <Link
+        key={link.alt}
+        href={link.href}
+        target="_blank"
+        className="opacity-50 flex-none flex justify-center items-center hover:opacity-100 transition-opacity duration-200"
+      >
+        <Image src={link.icon} alt={link.alt} width={20} height={20} />
+      </Link>
+    ))}
+  </div>
+);
+
+export default function Footer(props?: FooterProps) {
+  void props;
   const [isVisible, setIsVisible] = useState(false);
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -70,21 +86,6 @@ export default function Footer({ onOpenModal }: FooterProps) {
       }, 3000);
     }
   };
-
-  const SocialIcons = ({ className = "" }: { className?: string }) => (
-    <div className={`flex items-center gap-[22px] max-xs:gap-4 ${className}`}>
-      {socialLinks.map((link) => (
-        <Link
-          key={link.alt}
-          href={link.href}
-          target="_blank"
-          className="opacity-50 flex-none flex justify-center items-center hover:opacity-100 transition-opacity duration-200"
-        >
-          <Image src={link.icon} alt={link.alt} width={20} height={20} />
-        </Link>
-      ))}
-    </div>
-  );
 
   return (
     <footer

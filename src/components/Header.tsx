@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import MobileMenu from "./MobileMenu";
+import { createClient } from "@/lib/supabase/client";
+import { Profile } from "@/types/profile";
 
 interface HeaderProps {
   onOpenModal: () => void;
@@ -13,7 +15,9 @@ interface HeaderProps {
 export default function Header({ onOpenModal, isLoaded = true }: HeaderProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const headerRef = useRef<HTMLDivElement>(null);
+  const supabase = createClient();
 
   useEffect(() => {
     if (isLoaded) {
@@ -21,6 +25,57 @@ export default function Header({ onOpenModal, isLoaded = true }: HeaderProps) {
       return () => clearTimeout(timer);
     }
   }, [isLoaded]);
+
+  useEffect(() => {
+    async function checkAuth() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (data) {
+          setProfile(data as Profile);
+        } else {
+          setProfile({
+            id: user.id,
+            email: user.email ?? null,
+            full_name:
+              user.user_metadata?.full_name ||
+              user.user_metadata?.name ||
+              user.email?.split("@")[0] ||
+              "Explorer",
+            avatar_url:
+              user.user_metadata?.avatar_url ||
+              user.user_metadata?.picture ||
+              null,
+            role: "visitor",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        }
+      } else {
+        setProfile(null);
+      }
+    }
+
+    checkAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      checkAuth();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   const toggleMenu = () => {
     setMenuOpen((prev) => !prev);
@@ -90,14 +145,33 @@ export default function Header({ onOpenModal, isLoaded = true }: HeaderProps) {
                 </nav>
               </div>
 
-              {/* Desktop Login/Signup */}
+              {/* Desktop Login/Signup or Profile Pass */}
               <div className="max-lg:hidden">
-                <Link
-                  href="/login"
-                  className="btn-hero-fill inline-block text-center tracking-[0.1em] uppercase bg-transparent border border-white-50 rounded-lg min-w-[190px] px-[30px] pt-[17px] pb-[14px] font-bold text-white no-underline cursor-pointer relative overflow-hidden transition-all duration-200 hover:border-white hover:text-black"
-                >
-                  <span>Login / Sign Up</span>
-                </Link>
+                {profile ? (
+                  <Link
+                    href="/profile"
+                    className="flex items-center gap-3 py-2 px-4 rounded-xl border border-white/25 bg-white/5 hover:bg-white/10 hover:border-[#ffc75a]/50 transition-all duration-200 no-underline text-white group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-[#ffc75a]/20 border border-[#ffc75a]/40 flex items-center justify-center text-[#ffc75a] font-bold text-xs uppercase font-grotesque">
+                      {profile.full_name ? profile.full_name[0].toUpperCase() : "V"}
+                    </div>
+                    <div className="text-left">
+                      <span className="block text-xs font-bold font-grotesque leading-tight group-hover:text-[#ffc75a] transition-colors">
+                        {profile.full_name || "Museum Pass"}
+                      </span>
+                      <span className="block text-[9px] font-mono text-[#ffc75a] uppercase tracking-wider">
+                        Pass Active
+                      </span>
+                    </div>
+                  </Link>
+                ) : (
+                  <Link
+                    href="/login"
+                    className="btn-hero-fill inline-block text-center tracking-[0.1em] uppercase bg-transparent border border-white-50 rounded-lg min-w-[190px] px-[30px] pt-[17px] pb-[14px] font-bold text-white no-underline cursor-pointer relative overflow-hidden transition-all duration-200 hover:border-white hover:text-black"
+                  >
+                    <span>Login / Sign Up</span>
+                  </Link>
+                )}
               </div>
 
               {/* Mobile Hamburger */}
@@ -134,6 +208,7 @@ export default function Header({ onOpenModal, isLoaded = true }: HeaderProps) {
         isOpen={menuOpen}
         onClose={closeMenu}
         onOpenModal={onOpenModal}
+        profile={profile}
       />
     </>
   );

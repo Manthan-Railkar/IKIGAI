@@ -288,7 +288,7 @@ const ScrollStack: React.FC<ScrollStackProps> = ({
         syncTouch: true,
         syncTouchLerp: 0.075,
         touchInertia: 0.6,
-      } as any);
+      } as unknown as Record<string, unknown>);
 
       lenis.on("scroll", handleScroll);
 
@@ -322,9 +322,9 @@ const ScrollStack: React.FC<ScrollStackProps> = ({
       card.style.transformOrigin = "top center";
       card.style.backfaceVisibility = "hidden";
       card.style.transform = "translateZ(0)";
-      (card.style as any).webkitTransform = "translateZ(0)";
+      (card.style as unknown as Record<string, string>).webkitTransform = "translateZ(0)";
       card.style.perspective = "1000px";
-      (card.style as any).webkitPerspective = "1000px";
+      (card.style as unknown as Record<string, string>).webkitPerspective = "1000px";
     });
 
     setupLenis();

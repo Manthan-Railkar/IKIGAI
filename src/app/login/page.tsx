@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -21,12 +21,9 @@ function LoginForm() {
 
   const supabase = createClient();
 
-  useEffect(() => {
-    const error = searchParams.get("error");
-    if (error) {
-      setErrorMsg(decodeURIComponent(error));
-    }
-  }, [searchParams]);
+  const paramError = searchParams.get("error");
+  const displayError =
+    errorMsg || (paramError ? decodeURIComponent(paramError) : null);
 
   // Check if keys are still placeholder
   const isSupabaseConfigured =
@@ -101,11 +98,12 @@ function LoginForm() {
           },
         });
 
+        const nextDest = searchParams.get("next") || "/museums";
         if (error) {
           setErrorMsg(error.message);
         } else if (data.session) {
           setSuccessMsg("Account created! Redirecting...");
-          setTimeout(() => router.push("/"), 1500);
+          setTimeout(() => router.push(nextDest), 1200);
         } else {
           setSuccessMsg(
             "Account created! Please check your email inbox to confirm your account."
@@ -121,8 +119,9 @@ function LoginForm() {
         if (error) {
           setErrorMsg(error.message);
         } else if (data.session) {
+          const nextDest = searchParams.get("next") || "/museums";
           setSuccessMsg("Signed in successfully! Redirecting...");
-          setTimeout(() => router.push("/"), 1200);
+          setTimeout(() => router.push(nextDest), 1000);
         }
       }
     } catch (err: unknown) {
@@ -231,10 +230,10 @@ function LoginForm() {
         </div>
 
         {/* Error / Success Notifications */}
-        {errorMsg && (
+        {displayError && (
           <div className="mb-5 p-3.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs font-grotesque leading-relaxed flex items-start gap-2">
             <span className="text-rose-400 font-bold">✕</span>
-            <span>{errorMsg}</span>
+            <span>{displayError}</span>
           </div>
         )}
 
