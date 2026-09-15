@@ -206,3 +206,31 @@ body {
   from { opacity: 0; transform: translateY(-30px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+@keyframes scan-beam {
+  0% {
+    top: 2%;
+    opacity: 0.2;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    top: 96%;
+    opacity: 0.2;
+  }
+}
+
+/* Dev overlay suppression for clean mobile preview */
+nextjs-portal,
+[data-nextjs-toast],
+[data-nextjs-dev-tools-button],
+div[data-nextjs-dialog-overlay] {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+
