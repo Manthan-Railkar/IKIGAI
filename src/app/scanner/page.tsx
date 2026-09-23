@@ -43,6 +43,11 @@ function ScannerContent() {
   const [isPostScanActive, setIsPostScanActive] = useState(false);
   const [detectedInstrument, setDetectedInstrument] = useState<Instrument | null>(null);
 
+  // Search from Image interface state
+  const [isImageSearchActive, setIsImageSearchActive] = useState(false);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
+
   // Detection result — populated dynamically from the API
   const [detection, setDetection] = useState<DetectionResult | null>(null);
 
@@ -82,6 +87,7 @@ function ScannerContent() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const scanIdleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -220,7 +226,7 @@ function ScannerContent() {
 
   // State machine transitions for detection → verification → discovery
   useEffect(() => {
-    if (isPostScanActive) return;
+    if (isPostScanActive || isImageSearchActive) return;
 
     if (state === "SCANNING") {
       // 10-second idle timeout — if user doesn't scan anything,
@@ -338,6 +344,66 @@ function ScannerContent() {
     performDetection(frameBlob, cropped, full);
   }, [state, captureCameraFrame, performDetection]);
 
+  // Open dedicated Search from Image interface & pause live camera
+  const openImageSearch = useCallback(() => {
+    setIsImageSearchActive(true);
+    if (scanIdleTimerRef.current) {
+      clearTimeout(scanIdleTimerRef.current);
+      scanIdleTimerRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => {
+        track.enabled = false;
+      });
+    }
+    if (videoRef.current) {
+      videoRef.current.pause();
+    }
+  }, []);
+
+  // Close image search and turn camera back on
+  const closeImageSearch = useCallback(() => {
+    setIsImageSearchActive(false);
+    setSelectedImageFile(null);
+    setSelectedImagePreview(null);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => {
+        track.enabled = true;
+      });
+    }
+    if (videoRef.current) {
+      videoRef.current.play().catch(console.warn);
+    }
+    setState("SCANNING");
+  }, []);
+
+  // Handle image file selection inside image search interface
+  const handleFileSelected = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      setSelectedImageFile(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        if (dataUrl) {
+          setSelectedImagePreview(dataUrl);
+        }
+      };
+      reader.readAsDataURL(file);
+      e.target.value = "";
+    },
+    []
+  );
+
+  // Trigger YOLO detection on the uploaded image ("Get Info")
+  const handleGetInfo = useCallback(() => {
+    if (!selectedImageFile || !selectedImagePreview) return;
+    setIsImageSearchActive(false);
+    performDetection(selectedImageFile, selectedImagePreview, selectedImagePreview);
+  }, [selectedImageFile, selectedImagePreview, performDetection]);
+
   // Retry detection with the same pending frame
   const handleRetryDetection = useCallback(() => {
     if (pendingFrameRef.current) {
@@ -415,6 +481,118 @@ function ScannerContent() {
       {/* ── Persistent Cross-Instrument Jam Recording Bar ────────── */}
       <RecordingBar />
 
+      {/* ── Dedicated Search from Image Interface ────────────── */}
+      {isImageSearchActive && (
+        <div className="fixed inset-0 z-40 flex flex-col justify-between p-4 sm:p-6 bg-gradient-to-b from-[#0c0e12] via-[#090b0e] to-[#050608] text-white select-none animate-fade-in overflow-y-auto">
+          {/* Header */}
+          <header className="w-full max-w-xl mx-auto flex items-center justify-between border-b border-white/10 pb-3 pt-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-[#ffc75a] shadow-[0_0_10px_#ffc75a]" />
+              <div>
+                <span className="text-[10px] sm:text-xs font-mono uppercase tracking-[0.2em] text-[#ffc75a] font-semibold block">
+                  Search From Image
+                </span>
+                <span className="text-[9px] font-mono text-white/40">
+                  Artefact Photo Recognition
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={closeImageSearch}
+              className="text-xs font-grotesque uppercase tracking-wider text-white/70 hover:text-white flex items-center gap-1.5 py-1 px-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 cursor-pointer transition-colors"
+            >
+              <span>Back to Camera</span>
+              <span>✕</span>
+            </button>
+          </header>
+
+          {/* Main Upload / Get Info Card */}
+          <main className="flex-1 flex flex-col items-center justify-center py-6 w-full max-w-md mx-auto">
+            {!selectedImagePreview ? (
+              /* Dropzone / Upload Prompt */
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full aspect-[4/3] rounded-3xl border-2 border-dashed border-[#ffc75a]/40 hover:border-[#ffc75a] bg-[#14171e]/80 hover:bg-[#181c24] flex flex-col items-center justify-center p-6 text-center cursor-pointer transition-all duration-300 group shadow-2xl"
+              >
+                <div className="w-16 h-16 rounded-2xl bg-[#ffc75a]/10 border border-[#ffc75a]/30 flex items-center justify-center text-[#ffc75a] mb-4 group-hover:scale-110 transition-transform">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+
+                <h3 className="text-lg font-bold font-grotesque text-white mb-1">
+                  Upload Instrument Photo
+                </h3>
+                <p className="text-xs text-white/50 font-grotesque max-w-xs mb-4">
+                  Select an image of any museum instrument to identify it with YOLO
+                </p>
+
+                <span className="px-4 py-2 rounded-xl bg-[#ffc75a] text-black font-grotesque text-xs font-bold uppercase tracking-wider shadow-[0_0_20px_rgba(255,199,90,0.3)] group-hover:brightness-110 transition-all">
+                  Choose Image File
+                </span>
+              </div>
+            ) : (
+              /* Preview + Get Info */
+              <div className="w-full flex flex-col items-center animate-fade-in">
+                {/* Image Preview Box with Corner Brackets */}
+                <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden border-2 border-[#ffc75a] shadow-[0_0_35px_rgba(255,199,90,0.25)] mb-3 bg-black">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={selectedImagePreview}
+                    alt="Selected Artefact"
+                    className="w-full h-full object-contain filter brightness-95"
+                  />
+
+                  {/* Gold Corner Brackets */}
+                  <div className="absolute top-2 left-2 w-5 h-5 border-t-2 border-l-2 border-[#ffc75a]" />
+                  <div className="absolute top-2 right-2 w-5 h-5 border-t-2 border-r-2 border-[#ffc75a]" />
+                  <div className="absolute bottom-2 left-2 w-5 h-5 border-b-2 border-l-2 border-[#ffc75a]" />
+                  <div className="absolute bottom-2 right-2 w-5 h-5 border-b-2 border-r-2 border-[#ffc75a]" />
+                </div>
+
+                {/* File info */}
+                <div className="flex items-center justify-between w-full px-1 mb-5 text-xs font-mono text-white/60">
+                  <span className="truncate max-w-[200px]">{selectedImageFile?.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-[#ffc75a] hover:underline cursor-pointer"
+                  >
+                    Change Image
+                  </button>
+                </div>
+
+                {/* Action Buttons: GET INFO */}
+                <div className="w-full flex flex-col gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleGetInfo}
+                    className="btn-hero-fill w-full min-h-[48px] py-3.5 px-6 rounded-xl border border-[#ffc75a] bg-[#ffc75a] hover:bg-transparent text-black hover:text-[#ffc75a] font-grotesque text-sm font-bold uppercase tracking-widest shadow-[0_0_30px_rgba(255,199,90,0.4)] transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <span>GET INFO</span>
+                    <span>→</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={closeImageSearch}
+                    className="w-full py-2.5 px-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white font-grotesque text-xs uppercase tracking-wider transition-colors cursor-pointer text-center"
+                  >
+                    Cancel & Return to Live Scanner
+                  </button>
+                </div>
+              </div>
+            )}
+          </main>
+
+          <footer className="w-full max-w-xl mx-auto text-center py-2 text-[10px] font-mono text-white/30 uppercase tracking-widest">
+            Museum Melody // Fine-Tuned YOLO Instrument Vision
+          </footer>
+        </div>
+      )}
+
       {/* ── Active Post-Scan Journey Overlay ───────────────────── */}
       {isPostScanActive && (
         <PostScanExperience
@@ -434,7 +612,7 @@ function ScannerContent() {
           autoPlay
           muted
           className={`w-full h-full object-cover transition-opacity duration-300 ${
-            cameraActive && !frozenFullFrameUrl ? "opacity-100" : "opacity-0"
+            cameraActive && !frozenFullFrameUrl && !isImageSearchActive ? "opacity-100" : "opacity-0"
           }`}
         />
 
@@ -575,20 +753,41 @@ function ScannerContent() {
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setState("REQUESTING_CAMERA");
-                  setRetryCount((c) => c + 1);
-                }}
-                className="btn-hero-fill w-full py-2.5 px-4 rounded-xl border border-white text-white font-grotesque text-xs font-bold uppercase tracking-wider cursor-pointer hover:border-[#ffc75a] hover:text-[#ffc75a]"
-              >
-                <span>Grant / Retry Camera</span>
-              </button>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setState("REQUESTING_CAMERA");
+                    setRetryCount((c) => c + 1);
+                  }}
+                  className="btn-hero-fill w-full py-2.5 px-4 rounded-xl border border-white text-white font-grotesque text-xs font-bold uppercase tracking-wider cursor-pointer hover:border-[#ffc75a] hover:text-[#ffc75a]"
+                >
+                  <span>Grant / Retry Camera</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={openImageSearch}
+                  className="w-full py-2.5 px-4 rounded-xl border border-[#ffc75a]/40 bg-white/5 hover:bg-white/10 text-[#ffc75a] font-grotesque text-xs font-bold uppercase tracking-wider cursor-pointer transition-all flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span>Or Search from Image</span>
+                </button>
+              </div>
             )}
           </div>
         ) : (
           <>
+            {/* Hidden file input for image upload */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileSelected}
+            />
+
             {/* Responsive Viewfinder Reticle */}
             <div onClick={handleManualScan} className="cursor-pointer touch-manipulation" title="Tap to scan target">
               <ScanningReticle
@@ -632,16 +831,30 @@ function ScannerContent() {
               </div>
             )}
 
-            {/* Manual Scan Shutter Button */}
+            {/* Scan Controls: Manual Shutter + Search from Image */}
             {state === "SCANNING" && (
-              <button
-                type="button"
-                onClick={handleManualScan}
-                className="mt-4 flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#ffc75a] bg-black/80 hover:bg-[#ffc75a] hover:text-black text-[#ffc75a] font-grotesque text-[11px] sm:text-xs font-bold uppercase tracking-widest transition-all duration-300 backdrop-blur-xl shadow-[0_0_25px_rgba(255,199,90,0.3)] cursor-pointer active:scale-95 z-20 min-h-[44px]"
-              >
-                <div className="w-2 h-2 rounded-full bg-[#ffc75a] animate-ping" />
-                <span>Scan Physical Object</span>
-              </button>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5 z-20 px-2">
+                <button
+                  type="button"
+                  onClick={handleManualScan}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#ffc75a] bg-black/80 hover:bg-[#ffc75a] hover:text-black text-[#ffc75a] font-grotesque text-[11px] sm:text-xs font-bold uppercase tracking-widest transition-all duration-300 backdrop-blur-xl shadow-[0_0_25px_rgba(255,199,90,0.3)] cursor-pointer active:scale-95 min-h-[44px]"
+                >
+                  <div className="w-2 h-2 rounded-full bg-[#ffc75a] animate-ping" />
+                  <span>Scan Physical Object</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={openImageSearch}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 text-white hover:text-[#ffc75a] hover:border-[#ffc75a]/50 font-grotesque text-[11px] sm:text-xs font-medium uppercase tracking-wider transition-all duration-200 backdrop-blur-xl cursor-pointer active:scale-95 min-h-[44px]"
+                  title="Upload an instrument photo to detect with YOLO"
+                >
+                  <svg className="w-4 h-4 text-[#ffc75a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span>Search from Image</span>
+                </button>
+              </div>
             )}
           </>
         )}
