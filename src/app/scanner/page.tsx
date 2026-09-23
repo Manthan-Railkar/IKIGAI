@@ -7,6 +7,8 @@ import { ScannerState, ScannerErrorType, DetectionResult } from "@/types/scanner
 import ScanningReticle from "@/components/scanner/ScanningReticle";
 import DetectionOverlay from "@/components/scanner/DetectionOverlay";
 import PostScanExperience from "@/components/scanner/PostScanExperience";
+import RecordingBar from "@/components/scanner/RecordingBar";
+import { Instrument } from "@/types/instrument";
 import { CANONICAL_INSTRUMENTS } from "@/lib/supabase/instruments";
 import { CANONICAL_MUSEUMS } from "@/lib/supabase/museums";
 import { createClient } from "@/lib/supabase/client";
@@ -39,6 +41,7 @@ function ScannerContent() {
 
   // Post-scan experience state
   const [isPostScanActive, setIsPostScanActive] = useState(false);
+  const [detectedInstrument, setDetectedInstrument] = useState<Instrument | null>(null);
 
   // Detection result — populated dynamically from the API
   const [detection, setDetection] = useState<DetectionResult | null>(null);
@@ -310,6 +313,7 @@ function ScannerContent() {
       }
 
       // Successful detection — set the result and let state machine progress
+      setDetectedInstrument(instrument);
       setDetection({
         instrument_id: instrument.id,
         name: instrument.name.toUpperCase(),
@@ -408,9 +412,13 @@ function ScannerContent() {
 
   return (
     <div className="noise-bg fixed inset-0 w-full h-[100dvh] bg-black text-white select-none overflow-hidden flex flex-col justify-between z-50">
+      {/* ── Persistent Cross-Instrument Jam Recording Bar ────────── */}
+      <RecordingBar />
+
       {/* ── Active Post-Scan Journey Overlay ───────────────────── */}
       {isPostScanActive && (
         <PostScanExperience
+          instrument={detectedInstrument || undefined}
           onReturnToScanner={handleReturnFromPostScan}
           museumName={activeMuseum.name}
           capturedFrameUrl={capturedFrameUrl}

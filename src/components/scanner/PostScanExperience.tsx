@@ -3,18 +3,22 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { NoteEvent, soundEngine } from "@/lib/audio/soundEngine";
+import { sampleEngine } from "@/lib/audio/sampleEngine";
+import { sessionRecorder } from "@/lib/audio/sessionRecorder";
+import { Instrument } from "@/types/instrument";
 import AudioWaveform from "./AudioWaveform";
-import PlayableVeena from "./PlayableVeena";
+import PlayableStrings from "./PlayableStrings";
+import PlayableTiles from "./PlayableTiles";
 import FragmentationTransition from "./FragmentationTransition";
 import CompositionStudio from "./CompositionStudio";
 
 export type PostScanStep =
   | "DETECTION_COMPLETE"      // Step 1: Instrument detected + gold outline + catalogue verified
-  | "DISCOVERY_TRANSITION"    // Step 2: 3D Tile fragment shatter + reconstruct standalone Veena
+  | "DISCOVERY_TRANSITION"    // Step 2: 3D Tile fragment shatter + reconstruct standalone instrument
   | "INSTRUMENT_DISCOVERY"    // Step 3: Editorial discovery page with history + actions
-  | "HEAR_IT"                 // Step 4: Authentic raga sample + waveform visualization
-  | "PLAYABLE"                // Step 5: Interactive playable Veena with Sa-Re-Ga-Ma-Pa-Dha-Ni
-  | "RECORDING"               // Step 6a: Active recording state with 15s timer
+  | "HEAR_IT"                 // Step 4: Authentic sample + waveform visualization
+  | "PLAYABLE"                // Step 5: Interactive playable strings or tiles
+  | "RECORDING"               // Step 6a: Active recording state with timer
   | "PERFORMANCE_REVIEW"      // Step 6b: 'Your Performance' with Play, Retake, Add to Song
   | "COMPOSITION";            // Step 7: Multi-track 'My Song' layer view
 
@@ -23,16 +27,36 @@ interface PostScanExperienceProps {
   museumName?: string;
   capturedFrameUrl?: string;
   initialStep?: PostScanStep;
+  instrument?: Instrument;
   className?: string;
 }
 
+const DEFAULT_INSTRUMENT: Instrument = {
+  id: "saraswati-veena",
+  museum_id: "kelkar-museum",
+  name: "Veena",
+  category: "Tata (String)",
+  description:
+    "Handcrafted from seasoned jackwood and sacred dried gourds, the Veena has resonated through Indian royal courts and temple sanctuaries for centuries as the divine instrument of Saraswati.",
+  historical_context:
+    "Its 24 brass frets set in beeswax allow seamless microtonal glides (meend), bridging ancient temple sculpture depictions with living acoustic tradition.",
+  image_url: "/Assets/veena_reveal.jpg",
+  audio_url: "/Assets/audio_01.png",
+  model_class: "veena",
+  confidence_threshold: 0.75,
+  active: true,
+  interaction: "strings",
+};
+
 export default function PostScanExperience({
   onReturnToScanner,
-  museumName = "Raja Dinkar Kelkar Museum",
+  museumName = "Museum Heritage Collection",
   capturedFrameUrl = "/Assets/museum_sculpture_veena.jpg",
   initialStep = "DISCOVERY_TRANSITION",
+  instrument = DEFAULT_INSTRUMENT,
   className = "",
 }: PostScanExperienceProps) {
+  const activeInstrument = instrument || DEFAULT_INSTRUMENT;
   const [currentStep, setCurrentStep] = useState<PostScanStep>(initialStep);
 
   // Hear It playback state
@@ -50,6 +74,11 @@ export default function PostScanExperience({
   const [reviewHighlightedNote, setReviewHighlightedNote] = useState<string | null>(null);
   const reviewCleanupRef = useRef<(() => void) | null>(null);
 
+  // Preload real samples for the active instrument
+  useEffect(() => {
+    sampleEngine.loadInstrument(activeInstrument.id);
+  }, [activeInstrument.id]);
+
   // Auto-advance from Step 1 (Detection Complete) to Step 2 (Discovery Transition)
   useEffect(() => {
     if (currentStep === "DETECTION_COMPLETE") {
@@ -64,14 +93,43 @@ export default function PostScanExperience({
   const handleStartHearIt = useCallback(() => {
     setCurrentStep("HEAR_IT");
     setIsHearItPlaying(true);
-    soundEngine.playCuratedRaga(
-      (swara) => setHearItNote(swara),
-      () => {
+
+    if (activeInstrument.interaction === "strings") {
+      soundEngine.playCuratedRaga(
+        (swara) => setHearItNote(swara),
+        () => {
+          setIsHearItPlaying(false);
+          setHearItNote(null);
+        }
+      );
+    } else if (sampleEngine.isPercussion(activeInstrument.id)) {
+      // Play brief rhythmic phrase of real strokes
+      const strokes = sampleEngine.getStrokes(activeInstrument.id);
+      strokes.slice(0, 4).forEach((stroke, idx) => {
+        window.setTimeout(() => {
+          sampleEngine.playStroke(activeInstrument.id, stroke, 0.9);
+          setHearItNote(stroke);
+        }, idx * 450);
+      });
+      window.setTimeout(() => {
         setIsHearItPlaying(false);
         setHearItNote(null);
-      }
-    );
-  }, []);
+      }, strokes.length * 450 + 600);
+    } else {
+      // Melodic tile instrument phrase
+      const swaras = ["Sa", "Re", "Ga", "Ma", "Pa"];
+      swaras.forEach((swara, idx) => {
+        window.setTimeout(() => {
+          sampleEngine.playNote(activeInstrument.id, swara);
+          setHearItNote(swara);
+        }, idx * 600);
+      });
+      window.setTimeout(() => {
+        setIsHearItPlaying(false);
+        setHearItNote(null);
+      }, swaras.length * 600 + 800);
+    }
+  }, [activeInstrument]);
 
   const handleStopHearIt = useCallback(() => {
     soundEngine.stopCuratedRaga();
@@ -98,6 +156,11 @@ export default function PostScanExperience({
     setRecordingStartTime(start);
     setCurrentStep("RECORDING");
 
+    // Also start app-level session recorder if not already active
+    if (!sessionRecorder.isRecording()) {
+      sessionRecorder.start();
+    }
+
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     recordingTimerRef.current = window.setInterval(() => {
       const elapsed = Date.now() - start;
@@ -108,95 +171,105 @@ export default function PostScanExperience({
     }, 100);
   }, [handleStopRecording]);
 
-  const handleNotePlayed = useCallback((event: NoteEvent) => {
-    setRecordedNotes((prev) => [...prev, event]);
-  }, []);
-
   const handleRetakeRecording = useCallback(() => {
     if (reviewCleanupRef.current) {
       reviewCleanupRef.current();
       reviewCleanupRef.current = null;
     }
     setIsReviewPlaying(false);
-    setRecordedNotes([]);
+    setReviewHighlightedNote(null);
     handleStartRecording();
   }, [handleStartRecording]);
 
+  const handleNotePlayed = useCallback(
+    (event: NoteEvent) => {
+      setRecordedNotes((prev) => [...prev, event]);
+      // Log to session recorder for cross-instrument jam
+      sessionRecorder.logNote(activeInstrument.name, event.note, event.frequency);
+    },
+    [activeInstrument.name]
+  );
+
+  // ── Performance Review Playback ───────────────────────────────
   const handlePlayReview = useCallback(() => {
     if (isReviewPlaying) {
-      if (reviewCleanupRef.current) {
-        reviewCleanupRef.current();
-        reviewCleanupRef.current = null;
-      }
+      if (reviewCleanupRef.current) reviewCleanupRef.current();
       setIsReviewPlaying(false);
       setReviewHighlightedNote(null);
       return;
     }
 
     setIsReviewPlaying(true);
-    reviewCleanupRef.current = soundEngine.playComposition(
+    const notesToPlay =
       recordedNotes.length > 0
         ? recordedNotes
         : [
             { note: "Sa", frequency: 261.63, timestamp: 0, duration: 1000 },
             { note: "Re", frequency: 293.66, timestamp: 800, duration: 1000 },
-            { note: "Ga", frequency: 329.63, timestamp: 1600, duration: 1200 },
-            { note: "Pa", frequency: 392.0, timestamp: 2600, duration: 1600 },
-          ],
-      {
-        includeTabla: false,
-        includeSitar: true,
-        onNoteHighlight: (note) => setReviewHighlightedNote(note),
-        onComplete: () => {
-          setIsReviewPlaying(false);
-          setReviewHighlightedNote(null);
-        },
-      }
-    );
-  }, [isReviewPlaying, recordedNotes]);
+            { note: "Ga", frequency: 329.63, timestamp: 1600, duration: 1000 },
+            { note: "Pa", frequency: 392.0, timestamp: 2400, duration: 1200 },
+          ];
 
-  // Clean up sounds on unmount
+    const timeouts: number[] = [];
+
+    notesToPlay.forEach((ev) => {
+      const timer = window.setTimeout(() => {
+        if (activeInstrument.interaction === "strings") {
+          sampleEngine.playNote(activeInstrument.id, ev.note, ev.frequency);
+        } else if (sampleEngine.isPercussion(activeInstrument.id)) {
+          sampleEngine.playStroke(activeInstrument.id, ev.note);
+        } else {
+          sampleEngine.playNote(activeInstrument.id, ev.note, ev.frequency);
+        }
+        setReviewHighlightedNote(ev.note);
+      }, ev.timestamp);
+      timeouts.push(timer);
+    });
+
+    const maxTime = notesToPlay[notesToPlay.length - 1]?.timestamp || 3000;
+    const endTimer = window.setTimeout(() => {
+      setIsReviewPlaying(false);
+      setReviewHighlightedNote(null);
+    }, maxTime + 1200);
+    timeouts.push(endTimer);
+
+    reviewCleanupRef.current = () => {
+      timeouts.forEach((t) => clearTimeout(t));
+    };
+  }, [isReviewPlaying, recordedNotes, activeInstrument]);
+
+  // Cleanups
   useEffect(() => {
     return () => {
-      soundEngine.stopCuratedRaga();
-      soundEngine.stopDrone();
-      soundEngine.stopTablaLoop();
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
       if (reviewCleanupRef.current) reviewCleanupRef.current();
+      soundEngine.stopCuratedRaga();
+      soundEngine.stopDrone();
     };
   }, []);
 
-  // Format recording timer MM:SS
   const formatTimer = (ms: number) => {
-    const totalSec = Math.min(15, Math.floor(ms / 1000));
-    const secStr = totalSec.toString().padStart(2, "0");
-    return `00:${secStr} / 00:15`;
+    const totalSec = Math.floor(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${m}:${s < 10 ? "0" : ""}${s}`;
   };
 
+  const displayImage = activeInstrument.image_url || "/Assets/veena_reveal.jpg";
+
   return (
-    <div className={`fixed inset-0 z-40 bg-[#0d0f12] text-white flex flex-col overflow-y-auto noise-bg ${className}`}>
-      {/* ── Top Bar Header (Compact & Mobile-Optimized) ───────────── */}
-      <header className="z-20 w-full max-w-4xl mx-auto px-4 sm:px-6 pt-3 sm:pt-5 pb-2 flex justify-between items-center shrink-0">
-        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center backdrop-blur-md shrink-0">
-            <Image
-              src="/Assets/6aa66eef7361b4711b30b84f_logo.svg"
-              alt="Logo"
-              width={18}
-              height={18}
-              className="w-4 h-4 sm:w-5 sm:h-5"
-            />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="text-white font-grotesque font-bold text-xs uppercase tracking-wider leading-none">
-                Museum Melody
-              </span>
-              <span className="text-[#ffc75a] text-[9px] sm:text-[10px] font-mono tracking-widest uppercase shrink-0">
-                {"// LIVING ARCHIVE"}
-              </span>
+    <div
+      className={`fixed inset-0 z-50 flex flex-col justify-between overflow-y-auto bg-gradient-to-b from-[#0c0e12] via-[#090b0e] to-[#050608] text-white select-none ${className}`}
+    >
+      {/* ── Persistent Heritage Header ──────────────────────────── */}
+      <header className="z-20 w-full max-w-4xl mx-auto px-4 pt-3 sm:pt-4 pb-2 flex items-center justify-between border-b border-white/10 shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-2.5 h-2.5 rounded-full bg-[#ffc75a] shadow-[0_0_10px_#ffc75a]" />
+          <div>
+            <div className="text-[10px] sm:text-xs font-mono uppercase tracking-[0.2em] text-[#ffc75a] font-semibold">
+              MUSEUM MELODY // {activeInstrument.name.toUpperCase()}
             </div>
-            <div className="text-[9px] sm:text-[10px] font-mono text-white/50 tracking-wide mt-0.5 truncate max-w-[170px] sm:max-w-xs">
+            <div className="text-[9px] sm:text-[10px] font-mono text-white/40 truncate max-w-[190px] sm:max-w-xs">
               {museumName}
             </div>
           </div>
@@ -205,7 +278,7 @@ export default function PostScanExperience({
         {/* Quick Return / Exit Action */}
         <button
           type="button"
-          onClick={() => onReturnToScanner("saraswati-veena")}
+          onClick={() => onReturnToScanner(activeInstrument.id)}
           className="text-[10px] sm:text-xs font-grotesque uppercase tracking-wider text-white/70 hover:text-white flex items-center gap-1 py-1 px-2.5 sm:py-1.5 sm:px-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 cursor-pointer transition-colors shrink-0"
         >
           <span>Exit</span>
@@ -220,19 +293,18 @@ export default function PostScanExperience({
            ══════════════════════════════════════════════════════════ */}
         {currentStep === "DETECTION_COMPLETE" && (
           <div className="relative w-full max-w-md mx-auto flex flex-col items-center animate-fade-in py-1">
-            {/* Frozen Frame of Real Museum Sculpture or Real Camera Capture */}
             <div className="relative w-[270px] h-[340px] sm:w-[340px] sm:h-[420px] rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.9),0_0_35px_rgba(255,199,90,0.35)] border-2 border-[#ffc75a]">
               {capturedFrameUrl.startsWith("data:") ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={capturedFrameUrl}
-                  alt="Detected Real Camera Frame"
+                  alt="Detected Camera Frame"
                   className="w-full h-full object-cover filter brightness-95"
                 />
               ) : (
                 <Image
                   src={capturedFrameUrl}
-                  alt="Detected Veena Sculpture in Museum"
+                  alt="Detected Artefact"
                   fill
                   priority
                   className="object-cover object-center filter brightness-95"
@@ -245,27 +317,20 @@ export default function PostScanExperience({
               <div className="absolute bottom-2 left-2 w-6 h-6 sm:w-7 sm:h-7 border-b-2 border-l-2 border-[#ffc75a] shadow-[0_0_12px_#ffc75a]" />
               <div className="absolute bottom-2 right-2 w-6 h-6 sm:w-7 sm:h-7 border-b-2 border-r-2 border-[#ffc75a] shadow-[0_0_12px_#ffc75a]" />
 
-              {/* Subtle Detection Grid */}
-              <div className="absolute inset-0 grid grid-cols-4 grid-rows-4 pointer-events-none opacity-20">
-                {Array.from({ length: 16 }).map((_, i) => (
-                  <div key={i} className="border border-[#ffc75a]/50" />
-                ))}
-              </div>
-
               {/* Floating Detection Card */}
               <div className="absolute top-3 sm:top-4 left-1/2 -translate-x-1/2 w-[220px] sm:w-[240px] p-2.5 sm:p-3 rounded-xl border border-[#ffc75a]/40 bg-[#16181e]/90 backdrop-blur-xl shadow-2xl text-center">
                 <span className="text-[8px] sm:text-[9px] font-mono font-bold text-[#c88d3e] uppercase tracking-[0.2em] block mb-0.5">
                   INSTRUMENT DETECTED
                 </span>
                 <h3 className="font-grotesque font-bold text-white text-xl sm:text-2xl m-0 tracking-tight">
-                  VEENA
+                  {activeInstrument.name.toUpperCase()}
                 </h3>
                 <span className="text-[11px] sm:text-xs font-mono font-bold text-[#ffc75a] block mt-0.5">
-                  87% MATCH
+                  {Math.round(activeInstrument.confidence_threshold * 100)}% MATCH
                 </span>
               </div>
 
-              {/* Subtle Verification State */}
+              {/* Verified State */}
               <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 w-[240px] sm:w-[260px] py-1.5 sm:py-2 px-3 rounded-full border border-emerald-400/40 bg-[#15181e]/90 backdrop-blur-xl flex items-center justify-center gap-2 shadow-lg">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                 <span className="text-[10px] sm:text-[11px] font-grotesque font-bold text-emerald-300 uppercase tracking-wider">
@@ -287,8 +352,8 @@ export default function PostScanExperience({
           <FragmentationTransition
             isTransitioning={true}
             sourceImageUrl={capturedFrameUrl}
-            revealedImageUrl="/Assets/veena_reveal.jpg"
-            instrumentName="VEENA"
+            revealedImageUrl={displayImage}
+            instrumentName={activeInstrument.name.toUpperCase()}
             onTransitionComplete={() => setCurrentStep("INSTRUMENT_DISCOVERY")}
           />
         )}
@@ -298,7 +363,6 @@ export default function PostScanExperience({
            ══════════════════════════════════════════════════════════ */}
         {currentStep === "INSTRUMENT_DISCOVERY" && (
           <div className="w-full max-w-xl mx-auto flex flex-col items-center text-center animate-fade-in py-1 sm:py-2 px-2">
-            {/* Header Badge */}
             <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 rounded-full border border-[#ffc75a]/40 bg-[#ffc75a]/10 backdrop-blur-md mb-2 sm:mb-3 shadow-[0_0_20px_rgba(255,199,90,0.2)]">
               <span className="w-1.5 h-1.5 rounded-full bg-[#ffc75a]" />
               <span className="text-[9px] sm:text-[10px] font-mono uppercase tracking-[0.25em] text-[#ffc75a] font-bold">
@@ -306,21 +370,18 @@ export default function PostScanExperience({
               </span>
             </div>
 
-            {/* Instrument Name */}
             <h1 className="text-3xl sm:text-5xl md:text-6xl font-black font-grotesque text-white tracking-tight uppercase m-0 leading-none">
-              VEENA
+              {activeInstrument.name}
             </h1>
 
-            {/* Metadata Line */}
             <div className="text-[10px] sm:text-xs font-mono text-[#ffc75a] tracking-widest uppercase mt-1 mb-2.5 sm:mb-4">
-              Strings · India · 16th Century
+              {activeInstrument.category} · Authentic Sound
             </div>
 
-            {/* Cinematic Veena Visual (Proportioned for mobile screens) */}
             <div className="relative w-full max-w-[280px] sm:max-w-sm h-48 sm:h-64 md:h-72 rounded-xl sm:rounded-2xl overflow-hidden border border-white/20 shadow-[0_15px_40px_rgba(0,0,0,0.85),0_0_30px_rgba(255,199,90,0.25)] mb-3 sm:mb-4 group">
               <Image
-                src="/Assets/veena_reveal.jpg"
-                alt="Veena Masterpiece"
+                src={displayImage}
+                alt={activeInstrument.name}
                 fill
                 priority
                 className="object-cover object-center transition-transform duration-700 group-hover:scale-105"
@@ -328,17 +389,13 @@ export default function PostScanExperience({
               <div className="absolute inset-0 bg-gradient-to-t from-[#0d0f12] via-transparent to-transparent" />
             </div>
 
-            {/* Concise Historical Explanation */}
             <div className="max-w-sm sm:max-w-md text-white/70 font-grotesque text-xs sm:text-sm leading-relaxed mb-4 sm:mb-5 space-y-1.5 sm:space-y-2 px-2">
-              <p className="m-0">
-                Handcrafted from seasoned jackwood and sacred dried gourds, the Veena has resonated through Indian royal courts and temple sanctuaries for centuries as the divine instrument of Saraswati.
-              </p>
+              <p className="m-0">{activeInstrument.description}</p>
               <p className="m-0 text-white/50 text-[10px] sm:text-[11px] font-mono">
-                Its 24 brass frets set in beeswax allow seamless microtonal glides (meend), bridging ancient temple sculpture depictions with living acoustic tradition.
+                {activeInstrument.historical_context}
               </p>
             </div>
 
-            {/* Primary Actions */}
             <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 w-full max-w-sm">
               <button
                 type="button"
@@ -367,11 +424,10 @@ export default function PostScanExperience({
            ══════════════════════════════════════════════════════════ */}
         {currentStep === "HEAR_IT" && (
           <div className="w-full max-w-xl mx-auto flex flex-col items-center text-center animate-fade-in py-1 sm:py-2 px-2">
-            {/* Prominent Visual Header */}
             <div className="relative w-32 h-32 sm:w-44 sm:h-44 rounded-full overflow-hidden border-2 border-[#ffc75a] shadow-[0_0_40px_rgba(255,199,90,0.4)] mb-3 sm:mb-4">
               <Image
-                src="/Assets/veena_reveal.jpg"
-                alt="Veena Acoustic Resonance"
+                src={displayImage}
+                alt={activeInstrument.name}
                 fill
                 priority
                 className="object-cover object-center scale-110"
@@ -380,7 +436,7 @@ export default function PostScanExperience({
             </div>
 
             <div className="text-[9px] sm:text-[10px] font-mono text-[#ffc75a] uppercase tracking-[0.25em] mb-1">
-              RAGA YAMAN // MEDITATIVE ALAP
+              {activeInstrument.name.toUpperCase()} // ACOUSTIC RESONANCE
             </div>
 
             <h2 className="text-xl sm:text-3xl font-bold font-grotesque text-white tracking-tight m-0">
@@ -389,16 +445,14 @@ export default function PostScanExperience({
 
             {hearItNote && (
               <div className="mt-1.5 text-xs font-mono text-white/60">
-                Playing Swara: <span className="text-[#ffc75a] font-bold text-sm">[{hearItNote}]</span>
+                Resonating: <span className="text-[#ffc75a] font-bold text-sm">[{hearItNote}]</span>
               </div>
             )}
 
-            {/* Subtle Audio Waveform Visualizer */}
             <div className="w-full max-w-[240px] sm:max-w-xs my-3 sm:my-5">
               <AudioWaveform isActive={isHearItPlaying} height={40} barCount={28} />
             </div>
 
-            {/* Playback Controls */}
             <div className="flex items-center gap-3 mb-4 sm:mb-6">
               <button
                 type="button"
@@ -409,7 +463,6 @@ export default function PostScanExperience({
               </button>
             </div>
 
-            {/* Primary Action Button */}
             <button
               type="button"
               onClick={() => {
@@ -424,21 +477,23 @@ export default function PostScanExperience({
         )}
 
         {/* ══════════════════════════════════════════════════════════
-            STEP 5: PLAYABLE INSTRUMENT
+            STEP 5: PLAYABLE INSTRUMENT (Strings or Tiles)
            ══════════════════════════════════════════════════════════ */}
         {currentStep === "PLAYABLE" && (
           <div className="w-full max-w-xl mx-auto flex flex-col items-center animate-fade-in py-1 sm:py-2 px-1 sm:px-2">
-            {/* Title */}
             <div className="text-center mb-2 sm:mb-2.5">
               <h2 className="text-xl sm:text-3xl font-black font-grotesque text-white uppercase tracking-tight m-0">
-                PLAYABLE VEENA
+                PLAYABLE {activeInstrument.name.toUpperCase()}
               </h2>
               <span className="text-[9px] sm:text-[10px] font-mono text-[#ffc75a] uppercase tracking-wider block mt-0.5">
-                Sa · Re · Ga · Ma · Pa · Dha · Ni · Sa&apos;
+                {activeInstrument.interaction === "strings"
+                  ? "Sa · Re · Ga · Ma · Pa · Dha · Ni · Sa'"
+                  : sampleEngine.isPercussion(activeInstrument.id)
+                  ? "Na · Tin · Dha · Ge · Tun · Ke"
+                  : "Sa · Re · Ga · Ma · Pa · Dha · Ni · Sa'"}
               </span>
             </div>
 
-            {/* Record Action Button (Min 44px comfortable touch target) */}
             <div className="mb-2.5 sm:mb-3.5 w-full max-w-xs flex justify-center">
               <button
                 type="button"
@@ -450,8 +505,12 @@ export default function PostScanExperience({
               </button>
             </div>
 
-            {/* Interactive Playable Veena Component */}
-            <PlayableVeena />
+            {/* Dynamic Layout: Strings vs Tiles */}
+            {activeInstrument.interaction === "strings" ? (
+              <PlayableStrings instrument={activeInstrument} />
+            ) : (
+              <PlayableTiles instrument={activeInstrument} />
+            )}
           </div>
         )}
 
@@ -460,17 +519,15 @@ export default function PostScanExperience({
            ══════════════════════════════════════════════════════════ */}
         {currentStep === "RECORDING" && (
           <div className="w-full max-w-xl mx-auto flex flex-col items-center animate-fade-in py-1 sm:py-2 px-1 sm:px-2">
-            {/* Title */}
             <div className="text-center mb-2 sm:mb-2.5">
               <h2 className="text-xl sm:text-3xl font-black font-grotesque text-white uppercase tracking-tight m-0">
-                RECORDING VEENA
+                RECORDING {activeInstrument.name.toUpperCase()}
               </h2>
               <span className="text-[9px] sm:text-[10px] font-mono text-rose-400 uppercase tracking-wider block mt-0.5">
-                Pluck frets to capture your phrase (max 15s)
+                Play notes to capture your phrase (max 15s)
               </span>
             </div>
 
-            {/* Recording Active Status Bar */}
             <div className="w-full flex items-center justify-between p-2.5 sm:p-3 mb-2.5 sm:mb-3.5 rounded-xl border border-rose-500/50 bg-rose-950/30 backdrop-blur-xl shadow-[0_0_30px_rgba(244,63,94,0.25)]">
               <div className="flex items-center gap-2.5 sm:gap-3">
                 <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
@@ -484,12 +541,10 @@ export default function PostScanExperience({
                 </div>
               </div>
 
-              {/* 15s Timer */}
               <div className="text-xs sm:text-sm font-mono font-bold text-white tracking-widest">
                 {formatTimer(recordingElapsedMs)}
               </div>
 
-              {/* Stop Recording Button (Min 44px touch target) */}
               <button
                 type="button"
                 onClick={handleStopRecording}
@@ -500,12 +555,22 @@ export default function PostScanExperience({
               </button>
             </div>
 
-            {/* Interactive Frets for Recording */}
-            <PlayableVeena
-              isRecording={true}
-              recordingStartTime={recordingStartTime}
-              onNotePlayed={handleNotePlayed}
-            />
+            {/* Interactive Component for Recording */}
+            {activeInstrument.interaction === "strings" ? (
+              <PlayableStrings
+                instrument={activeInstrument}
+                isRecording={true}
+                recordingStartTime={recordingStartTime}
+                onNotePlayed={handleNotePlayed}
+              />
+            ) : (
+              <PlayableTiles
+                instrument={activeInstrument}
+                isRecording={true}
+                recordingStartTime={recordingStartTime}
+                onNotePlayed={handleNotePlayed}
+              />
+            )}
           </div>
         )}
 
@@ -514,7 +579,6 @@ export default function PostScanExperience({
            ══════════════════════════════════════════════════════════ */}
         {currentStep === "PERFORMANCE_REVIEW" && (
           <div className="w-full max-w-xl mx-auto flex flex-col items-center text-center animate-fade-in py-1 sm:py-2 px-2">
-            {/* Header Badge */}
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/20 bg-white/5 backdrop-blur-md mb-2 shadow-md">
               <span className="w-2 h-2 rounded-full bg-[#ffc75a]" />
               <span className="text-[9px] sm:text-[10px] font-mono uppercase tracking-widest text-white/70">
@@ -528,14 +592,14 @@ export default function PostScanExperience({
 
             <p className="text-white/50 text-xs font-grotesque mt-1 mb-4 sm:mb-5">
               {recordedNotes.length > 0
-                ? `${recordedNotes.length} Swaras played over ${Math.ceil(recordingElapsedMs / 1000)} seconds`
+                ? `${recordedNotes.length} notes played over ${Math.ceil(recordingElapsedMs / 1000)} seconds`
                 : "Acoustic phrase captured"}
             </p>
 
             {/* Performance Timeline Visualization Card */}
             <div className="w-full p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-white/15 bg-[#14171d]/90 backdrop-blur-xl shadow-xl mb-4 sm:mb-6">
               <div className="flex justify-between items-center text-[9px] sm:text-[10px] font-mono text-white/40 uppercase tracking-widest mb-2.5 sm:mb-3">
-                <span>VEENA // TAKE 01</span>
+                <span>{activeInstrument.name.toUpperCase()} // TAKE 01</span>
                 <span>{recordedNotes.length} NOTES</span>
               </div>
 
@@ -632,8 +696,8 @@ export default function PostScanExperience({
         {currentStep === "COMPOSITION" && (
           <CompositionStudio
             recordedNotes={recordedNotes}
-            instrumentName="VEENA"
-            onKeepExploring={() => onReturnToScanner("saraswati-veena")}
+            instrumentName={activeInstrument.name.toUpperCase()}
+            onKeepExploring={() => onReturnToScanner(activeInstrument.id)}
           />
         )}
       </main>

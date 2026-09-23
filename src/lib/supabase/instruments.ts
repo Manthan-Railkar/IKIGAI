@@ -18,6 +18,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 1,
+    interaction: "strings",
   },
   {
     id: "miraj-tanpura",
@@ -34,6 +35,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.8,
     active: true,
     display_order: 2,
+    interaction: "strings",
   },
   {
     id: "tutari",
@@ -50,6 +52,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.8,
     active: true,
     display_order: 3,
+    interaction: "tiles",
   },
   {
     id: "pakhawaj",
@@ -66,6 +69,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 4,
+    interaction: "tiles",
   },
   {
     id: "sundari",
@@ -82,6 +86,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 5,
+    interaction: "tiles",
   },
   {
     id: "tarpa",
@@ -98,6 +103,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 6,
+    interaction: "tiles",
   },
   {
     id: "ektara-tuntuna",
@@ -114,6 +120,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 7,
+    interaction: "strings",
   },
   {
     id: "dholki",
@@ -130,6 +137,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.8,
     active: true,
     display_order: 8,
+    interaction: "tiles",
   },
   {
     id: "santoor",
@@ -146,6 +154,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 9,
+    interaction: "tiles",
   },
 
   // CSMVS MUMBAI (csmvs) — 10 instruments matching the YOLO detection model
@@ -164,6 +173,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 1,
+    interaction: "tiles",
   },
   {
     id: "sitar",
@@ -180,6 +190,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 2,
+    interaction: "strings",
   },
   {
     id: "tanpura",
@@ -196,6 +207,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 3,
+    interaction: "strings",
   },
   {
     id: "sarangi",
@@ -212,6 +224,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 4,
+    interaction: "strings",
   },
   {
     id: "bansuri",
@@ -228,6 +241,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 5,
+    interaction: "tiles",
   },
   {
     id: "shehnai",
@@ -244,6 +258,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 6,
+    interaction: "tiles",
   },
   {
     id: "pakhawaj",
@@ -260,6 +275,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 7,
+    interaction: "tiles",
   },
   {
     id: "harmonium",
@@ -276,6 +292,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 8,
+    interaction: "tiles",
   },
   {
     id: "santoor",
@@ -292,6 +309,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 9,
+    interaction: "tiles",
   },
   {
     id: "sarod",
@@ -308,6 +326,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 10,
+    interaction: "strings",
   },
 
   // DR. BHAU DAJI LAD MUMBAI CITY MUSEUM (bhau-daji-lad)
@@ -326,6 +345,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 1,
+    interaction: "strings",
   },
   {
     id: "pungi-been",
@@ -342,6 +362,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 2,
+    interaction: "tiles",
   },
   {
     id: "morchang",
@@ -358,6 +379,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 3,
+    interaction: "tiles",
   },
   {
     id: "swarmandal",
@@ -374,6 +396,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 4,
+    interaction: "strings",
   },
   {
     id: "chimta",
@@ -390,6 +413,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 5,
+    interaction: "tiles",
   },
   {
     id: "khanjira",
@@ -406,6 +430,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 6,
+    interaction: "tiles",
   },
   {
     id: "taal-manjira",
@@ -422,6 +447,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 7,
+    interaction: "tiles",
   },
   {
     id: "surshringar",
@@ -438,6 +464,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     confidence_threshold: 0.75,
     active: true,
     display_order: 8,
+    interaction: "strings",
   },
 ];
 
@@ -469,7 +496,7 @@ export async function getInstrumentsByMuseum(
       );
     }
 
-    return data as Instrument[];
+    return (data as Instrument[]).map(inst => ({ ...inst, interaction: inst.interaction || (inst.category?.includes("String") ? "strings" : "tiles") }));
   } catch (err) {
     console.warn("Exception loading instruments:", err);
     return CANONICAL_INSTRUMENTS.filter(
@@ -499,7 +526,7 @@ export async function getInstrumentById(
       return fallback || null;
     }
 
-    return data as Instrument;
+    const inst = data as Instrument; return { ...inst, interaction: inst.interaction || (inst.category?.includes("String") ? "strings" : "tiles") };
   } catch {
     const fallback = CANONICAL_INSTRUMENTS.find(
       (inst) => inst.id === instrumentId

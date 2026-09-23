@@ -6,13 +6,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentProfile, updateCurrentProfile } from "@/lib/supabase/profile";
+import { getUserRecordings, deleteUserRecording } from "@/lib/supabase/recordings";
 import { Profile } from "@/types/profile";
+import { UserRecording } from "@/types/recording";
 
 export default function ProfilePage() {
   const router = useRouter();
   const supabase = createClient();
 
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [recordings, setRecordings] = useState<UserRecording[]>([]);
   const [discoveredCount, setDiscoveredCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [editingName, setEditingName] = useState(false);
@@ -23,6 +26,7 @@ export default function ProfilePage() {
     text: string;
   } | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadUserData() {
@@ -36,12 +40,14 @@ export default function ProfilePage() {
         return;
       }
 
-      const [{ profile: userProfile, error }, count] = await Promise.all([
-        getCurrentProfile(supabase),
-        import("@/lib/supabase/discoveries").then((m) =>
-          m.getUserTotalDiscoveriesCount(supabase)
-        ),
-      ]);
+      const [{ profile: userProfile, error }, count, { recordings: userRecordings }] =
+        await Promise.all([
+          getCurrentProfile(supabase),
+          import("@/lib/supabase/discoveries").then((m) =>
+            m.getUserTotalDiscoveriesCount(supabase)
+          ),
+          getUserRecordings(supabase),
+        ]);
 
       if (error) {
         console.error("Profile load error:", error);
@@ -52,6 +58,7 @@ export default function ProfilePage() {
         setFullName(userProfile.full_name || "");
       }
       setDiscoveredCount(count);
+      setRecordings(userRecordings);
       setLoading(false);
     }
 
@@ -86,6 +93,16 @@ export default function ProfilePage() {
     setSavingName(false);
   };
 
+  const handleDeleteRecording = async (rec: UserRecording) => {
+    if (!confirm(`Delete recording "${rec.title}"?`)) return;
+    setDeletingId(rec.id);
+    const { success } = await deleteUserRecording(supabase, rec.id, rec.audio_url);
+    setDeletingId(null);
+    if (success) {
+      setRecordings((prev) => prev.filter((r) => r.id !== rec.id));
+    }
+  };
+
   const handleSignOut = async () => {
     setLoggingOut(true);
     await supabase.auth.signOut();
@@ -93,104 +110,72 @@ export default function ProfilePage() {
     router.refresh();
   };
 
+  const formatDuration = (ms: number) => {
+    const totalSec = Math.floor(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${m}:${s < 10 ? "0" : ""}${s}`;
+  };
+
   if (loading) {
     return (
       <div className="noise-bg min-h-screen bg-[#0d0f12] flex flex-col items-center justify-center text-white px-4">
         <div className="w-10 h-10 border-2 border-white/20 border-t-[#ffc75a] rounded-full animate-spin mb-4" />
         <div className="text-xs uppercase tracking-[0.2em] font-grotesque text-white/50">
-          Retrieving Museum Pass...
+          Accessing Museum Archive...
         </div>
       </div>
     );
   }
 
-  const initials = (profile?.full_name || "Visitor")
-    .split(" ")
-    .map((n) => n[0])
+  const initials = (profile?.full_name || profile?.email || "ME")
     .slice(0, 2)
-    .join("")
     .toUpperCase();
 
   const formattedDate = profile?.created_at
     ? new Date(profile.created_at).toLocaleDateString("en-US", {
         month: "short",
-        day: "numeric",
         year: "numeric",
       })
-    : "Active Member";
-
-  const passId = profile?.id
-    ? `MM-${profile.id.substring(0, 8).toUpperCase()}`
-    : "MM-PILOT-01";
+    : "Active Season";
 
   return (
-    <div className="noise-bg min-h-screen relative flex flex-col justify-center items-center px-4 sm:px-6 py-12 select-none overflow-hidden bg-[#0d0f12]">
-      {/* Ambient museum lighting glows */}
-      <div className="z-0 absolute top-[-200px] right-[-180px] w-[600px] h-[600px] rounded-full bg-[#c11822]/15 blur-[140px] pointer-events-none" />
-      <div className="z-0 absolute bottom-[-220px] left-[-180px] w-[600px] h-[600px] rounded-full bg-[#ffc75a]/12 blur-[140px] pointer-events-none" />
+    <div className="noise-bg min-h-screen bg-[#0d0f12] text-white flex flex-col items-center justify-center p-4 sm:p-6 md:p-8">
+      {/* Background Decor Elements */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-[#ffc75a]/5 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Top Header Navigation */}
-      <div className="w-full max-w-[540px] flex justify-between items-center mb-8 z-10">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-white/60 hover:text-white transition-colors duration-200 text-xs sm:text-sm font-grotesque tracking-wider uppercase"
-        >
-          <span className="text-lg leading-none">←</span> Return to Museum
-        </Link>
-        <Link href="/" className="opacity-80 hover:opacity-100 transition-opacity">
-          <Image
-            src="/Assets/6aa66eef7361b4711b30b84f_logo.svg"
-            alt="Museum Logo"
-            width={32}
-            height={32}
-            className="w-7 h-7"
-          />
-        </Link>
-      </div>
-
-      {/* Main Virtual Pass Card */}
-      <div className="z-10 w-full max-w-[540px] rounded-[28px] border border-white/20 bg-[#15181e]/90 backdrop-blur-2xl p-6 sm:p-9 shadow-[0_30px_80px_rgba(0,0,0,0.85),0_0_45px_rgba(255,199,90,0.15)] relative overflow-hidden">
-        {/* Pass Top Metallic Gold Accent Stripe */}
-        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#c11822] via-[#ffc75a] to-[#c11822]" />
-
-        {/* Card Header Stamp */}
-        <div className="flex items-center justify-between border-b border-white/10 pb-6 mb-6">
-          <div>
-            <div className="text-[#ffc75a] tracking-[0.25em] uppercase text-[10px] font-mono font-bold mb-1">
-              Official Visitor Credential
-            </div>
-            <h1 className="font-grotesque font-black text-2xl sm:text-3xl text-white tracking-tight m-0">
-              Virtual Museum Pass
-            </h1>
+      {/* Main Content Card: Museum Access Pass */}
+      <div className="relative w-full max-w-xl rounded-3xl border border-white/15 bg-gradient-to-b from-[#181b22] to-[#101216] p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
+        {/* Pass Top Badge / Barcode Decor */}
+        <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-[#ffc75a] animate-pulse" />
+            <span className="text-[10px] sm:text-xs font-mono tracking-[0.25em] text-[#ffc75a] uppercase font-semibold">
+              Official Heritage Pass
+            </span>
           </div>
-          <div className="flex flex-col items-end">
-            <span className="px-2.5 py-1 rounded-full text-[10px] font-mono uppercase font-bold tracking-wider bg-[#ffc75a]/15 text-[#ffc75a] border border-[#ffc75a]/30">
-              {profile?.role || "Visitor"}
-            </span>
-            <span className="text-[10px] text-white/40 font-mono mt-1">
-              {passId}
-            </span>
+          <div className="text-[10px] font-mono text-white/30 uppercase tracking-widest hidden sm:block">
+            NO. {profile?.id?.slice(0, 8) || "8841-IKIGAI"}
           </div>
         </div>
 
-        {/* Feedback Messages */}
+        {/* Status Alerts */}
         {statusMessage && (
           <div
-            className={`mb-6 p-3 rounded-xl border text-xs font-grotesque leading-relaxed flex items-center gap-2 ${
+            className={`p-3 rounded-xl mb-6 text-xs font-grotesque flex items-center gap-2 border ${
               statusMessage.type === "success"
-                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                : "border-rose-500/30 bg-rose-500/10 text-rose-300"
+                ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-300"
+                : "bg-rose-950/40 border-rose-500/40 text-rose-300"
             }`}
           >
-            <span>{statusMessage.type === "success" ? "✓" : "✕"}</span>
+            <span>{statusMessage.type === "success" ? "✓" : "!"}</span>
             <span>{statusMessage.text}</span>
           </div>
         )}
 
-        {/* Visitor Identity Section */}
-        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 mb-8">
-          {/* Avatar / Monogram */}
-          <div className="relative">
+        {/* Profile Card Identity Area */}
+        <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-6 mb-8">
+          <div className="relative shrink-0">
             {profile?.avatar_url ? (
               <Image
                 src={profile.avatar_url}
@@ -204,10 +189,12 @@ export default function ProfilePage() {
                 {initials}
               </div>
             )}
-            <div className="absolute -bottom-1.5 -right-1.5 w-5 h-5 rounded-full bg-emerald-500 border-2 border-[#15181e]" title="Active Explorer" />
+            <div
+              className="absolute -bottom-1.5 -right-1.5 w-5 h-5 rounded-full bg-emerald-500 border-2 border-[#15181e]"
+              title="Active Explorer"
+            />
           </div>
 
-          {/* Visitor Details */}
           <div className="flex-1 text-center sm:text-left">
             {editingName ? (
               <form onSubmit={handleUpdateName} className="flex flex-col gap-2">
@@ -265,7 +252,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Discovery Progress Statistics Grid */}
-        <div className="grid grid-cols-3 gap-3 mb-8">
+        <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="p-3.5 rounded-xl border border-white/10 bg-white/[0.03] text-center">
             <span className="block text-[10px] font-mono text-white/40 uppercase tracking-widest mb-1">
               Museums
@@ -292,15 +279,115 @@ export default function ProfilePage() {
 
           <div className="p-3.5 rounded-xl border border-white/10 bg-white/[0.03] text-center">
             <span className="block text-[10px] font-mono text-white/40 uppercase tracking-widest mb-1">
-              Badges
+              Recordings
             </span>
-            <span className="text-xl font-black font-grotesque text-[#c11822]">
-              0
+            <span className="text-xl font-black font-grotesque text-[#00e5ff]">
+              {recordings.length}
             </span>
             <span className="block text-[9px] text-white/30 uppercase mt-0.5">
-              Earned
+              Saved Jams
             </span>
           </div>
+        </div>
+
+        {/* ── My Cloud Jam Sessions ─────────────────────────────── */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#00e5ff]" />
+              <h3 className="text-xs font-mono uppercase tracking-[0.2em] text-[#00e5ff] font-bold m-0">
+                My Recorded Jams
+              </h3>
+            </div>
+            <Link
+              href="/scanner"
+              className="text-[10px] font-mono text-[#ffc75a] hover:underline uppercase tracking-wider"
+            >
+              + Jam in Scanner
+            </Link>
+          </div>
+
+          {recordings.length === 0 ? (
+            <div className="p-5 rounded-2xl border border-white/10 bg-white/[0.02] text-center">
+              <p className="text-xs text-white/50 font-grotesque mb-2">
+                No cloud recordings yet.
+              </p>
+              <p className="text-[11px] text-white/40 font-mono mb-3">
+                Scan museum instruments and tap &ldquo;Record Jam&rdquo; to capture live performances into your pass!
+              </p>
+              <Link
+                href="/scanner"
+                className="inline-block px-3 py-1.5 rounded-lg border border-white/20 bg-white/5 text-[11px] font-grotesque text-white hover:bg-white/10 transition-colors uppercase tracking-wider"
+              >
+                Go to Scanner →
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+              {recordings.map((rec) => (
+                <div
+                  key={rec.id}
+                  className="p-3.5 rounded-xl border border-white/10 bg-white/[0.03] hover:border-white/20 transition-all"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div>
+                      <h4 className="text-sm font-bold font-grotesque text-white m-0 leading-tight">
+                        {rec.title}
+                      </h4>
+                      <div className="flex items-center gap-2 mt-0.5 text-[10px] font-mono text-white/50">
+                        <span>{new Date(rec.created_at).toLocaleDateString()}</span>
+                        <span>·</span>
+                        <span>{formatDuration(rec.duration_ms)}</span>
+                        <span>·</span>
+                        <span className="text-[#ffc75a]">{rec.notes_count} notes</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <a
+                        href={rec.audio_url}
+                        download={`jam-${rec.id.slice(0, 6)}.mp3`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-white font-mono text-[10px] uppercase transition-colors"
+                        title="Download MP3"
+                      >
+                        ↓
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRecording(rec)}
+                        disabled={deletingId === rec.id}
+                        className="px-2 py-1 rounded bg-white/5 hover:bg-rose-500/20 text-white/40 hover:text-rose-400 font-mono text-[10px] uppercase transition-colors cursor-pointer"
+                        title="Delete recording"
+                      >
+                        {deletingId === rec.id ? "…" : "✕"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {rec.instruments && rec.instruments.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2.5">
+                      {rec.instruments.map((inst, i) => (
+                        <span
+                          key={i}
+                          className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[9px] font-mono text-white/70 uppercase"
+                        >
+                          {inst}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <audio
+                    controls
+                    src={rec.audio_url}
+                    className="w-full h-8 rounded filter invert hue-rotate-180"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Pass Actions */}

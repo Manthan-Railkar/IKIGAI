@@ -79,6 +79,16 @@ class SoundEngine {
     return this.analyser;
   }
 
+  public getContext(): AudioContext | null {
+    this.resume();
+    return this.ctx;
+  }
+
+  public getMasterGain(): GainNode | null {
+    this.resume();
+    return this.masterGain;
+  }
+
   /**
    * Synthesize a single authentic plucked Veena string tone.
    * Uses harmonic blend + jawari buzz + dual resonant acoustic filters.

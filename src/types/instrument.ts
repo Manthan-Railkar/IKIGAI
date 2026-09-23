@@ -12,6 +12,7 @@ export interface Instrument {
   active: boolean;
   display_order?: number;
   created_at?: string;
+  interaction: "strings" | "tiles";
 }
 
 export type InstrumentCategory =
