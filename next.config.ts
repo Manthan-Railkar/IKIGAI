@@ -5,6 +5,14 @@ const nextConfig: NextConfig = {
   images: {
     formats: ["image/webp"],
   },
+  async rewrites() {
+    return [
+      {
+        source: "/api/detect",
+        destination: "http://localhost:8000/detect",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

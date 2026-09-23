@@ -11,6 +11,8 @@ import { CANONICAL_INSTRUMENTS } from "@/lib/supabase/instruments";
 import { CANONICAL_MUSEUMS } from "@/lib/supabase/museums";
 import { createClient } from "@/lib/supabase/client";
 import { recordDiscovery } from "@/lib/supabase/discoveries";
+import { detectInstrument, dataUrlToBlob } from "@/lib/detectionApi";
+import { resolveInstrument } from "@/lib/classMap";
 
 interface CollectionItem {
   id: string;
@@ -27,6 +29,7 @@ function ScannerContent() {
 
   const [state, setState] = useState<ScannerState>("REQUESTING_CAMERA");
   const [errorType, setErrorType] = useState<ScannerErrorType | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>("");
   const [cameraActive, setCameraActive] = useState(false);
   const [showCollectionDrawer, setShowCollectionDrawer] = useState(false);
 
@@ -37,47 +40,37 @@ function ScannerContent() {
   // Post-scan experience state
   const [isPostScanActive, setIsPostScanActive] = useState(false);
 
+  // Detection result — populated dynamically from the API
+  const [detection, setDetection] = useState<DetectionResult | null>(null);
+
+  // Pending frame blob for retry
+  const pendingFrameRef = useRef<Blob | null>(null);
+
   // Museum & target instrument resolution
   const activeMuseum =
     CANONICAL_MUSEUMS.find((m) => m.id === museumId) || CANONICAL_MUSEUMS[0];
 
-  const targetInstrument =
-    CANONICAL_INSTRUMENTS.find(
-      (inst) => inst.id === targetInstrumentId && inst.museum_id === museumId
-    ) ||
-    CANONICAL_INSTRUMENTS.find((inst) => inst.id === "saraswati-veena" || inst.id === "mayuri-veena") ||
-    CANONICAL_INSTRUMENTS[0];
-
-  const [detection, setDetection] = useState<DetectionResult>({
-    instrument_id: targetInstrument.id,
-    name: "VEENA",
-    category: "Strings · Tata Vadya",
-    confidence: 87,
-  });
-
   // Track discovered instruments for the museum collection loop
-  const [discoveredIds, setDiscoveredIds] = useState<Set<string>>(
-    new Set(["saraswati-veena"]) // 1 / 10 Discovered initially
-  );
+  const [discoveredIds, setDiscoveredIds] = useState<Set<string>>(new Set());
 
-  // Derive complete 10-item museum collection status
+  // The 10 YOLO model target classes — shown in collection drawer
   const museumCollection: CollectionItem[] = useMemo(() => {
-    const list = [
-      { id: "saraswati-veena", name: "VEENA", category: "Strings" },
-      { id: "tabla-pair", name: "TABLA", category: "Percussion" },
+    const yoloTargets = [
+      { id: "tabla", name: "TABLA", category: "Percussion" },
       { id: "sitar", name: "SITAR", category: "Strings" },
-      { id: "bansuri", name: "FLUTE", category: "Wind" },
-      { id: "pakhawaj", name: "PAKHAWAJ", category: "Percussion" },
+      { id: "tanpura", name: "TANPURA", category: "Strings" },
+      { id: "sarangi", name: "SARANGI", category: "Strings" },
+      { id: "bansuri", name: "BANSURI", category: "Wind" },
       { id: "shehnai", name: "SHEHNAI", category: "Wind" },
+      { id: "pakhawaz", name: "PAKHAWAZ", category: "Percussion" },
+      { id: "harmonium", name: "HARMONIUM", category: "Keyboard" },
       { id: "santoor", name: "SANTOOR", category: "Strings" },
-      { id: "esraj", name: "ESRAJ", category: "Strings" },
-      { id: "jaltarang", name: "JALTARANG", category: "Percussion" },
       { id: "sarod", name: "SAROD", category: "Strings" },
     ];
 
-    return list.map((item) => ({
-      ...item,
-      isDiscovered: discoveredIds.has(item.id) || (item.name === "VEENA" && discoveredIds.has("saraswati-veena")),
+    return yoloTargets.map((inst) => ({
+      ...inst,
+      isDiscovered: discoveredIds.has(inst.id),
     }));
   }, [discoveredIds]);
 
@@ -87,6 +80,7 @@ function ScannerContent() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const scanIdleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
   // Capture current live video frame:
@@ -221,64 +215,144 @@ function ScannerContent() {
     };
   }, [retryCount]);
 
-  // Automatic camera detection state progression
+  // State machine transitions for detection → verification → discovery
   useEffect(() => {
     if (isPostScanActive) return;
 
     if (state === "SCANNING") {
-      // Auto-detect after scanning for 3.5 seconds
-      timerRef.current = setTimeout(() => {
-        const { cropped, full } = captureCameraFrame();
-        setCapturedFrameUrl(cropped);
-        setFrozenFullFrameUrl(full);
-        if (videoRef.current) {
-          videoRef.current.pause();
-        }
-        setDetection({
-          instrument_id: targetInstrument.id,
-          name: "VEENA",
-          category: "Strings · Tata Vadya",
-          confidence: 87,
-        });
-        setState("DETECTING");
-      }, 3500);
-    } else if (state === "DETECTING") {
+      // 10-second idle timeout — if user doesn't scan anything,
+      // show "no object detected" and navigate back to museum
+      scanIdleTimerRef.current = setTimeout(() => {
+        setState("NOT_DETECTED");
+      }, 10000);
+    } else {
+      // Clear idle timer when leaving SCANNING state
+      if (scanIdleTimerRef.current) {
+        clearTimeout(scanIdleTimerRef.current);
+        scanIdleTimerRef.current = null;
+      }
+    }
+
+    if (state === "DETECTING") {
       // Hold detection state for 1.4s then transition to verification
       timerRef.current = setTimeout(() => {
         setState("VERIFYING");
       }, 1400);
     } else if (state === "VERIFYING") {
-      // Hold verification state for 1.2s then transition DIRECTLY into discovery experience
+      // Hold verification state for 1.2s then transition to discovery
       timerRef.current = setTimeout(() => {
         setState("DISCOVERED");
         setIsPostScanActive(true);
       }, 1200);
+    } else if (state === "NOT_DETECTED") {
+      // Show "no object detected" for 2.5s, then navigate back to museum
+      timerRef.current = setTimeout(() => {
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((t) => t.stop());
+        }
+        router.push(`/museum/${museumId}`);
+      }, 2500);
     }
 
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
+      if (scanIdleTimerRef.current) {
+        clearTimeout(scanIdleTimerRef.current);
+        scanIdleTimerRef.current = null;
+      }
     };
-  }, [state, targetInstrument, isPostScanActive, captureCameraFrame]);
+  }, [state, isPostScanActive, router, museumId]);
+
+  /**
+   * Send a captured frame to the YOLO backend and handle the response.
+   * This is the core detection flow — called by both manual scan and retry.
+   */
+  const performDetection = useCallback(
+    async (frameBlob: Blob, croppedUrl: string, fullUrl: string) => {
+      // Freeze the camera and show scanning animation
+      setCapturedFrameUrl(croppedUrl);
+      setFrozenFullFrameUrl(fullUrl);
+      if (videoRef.current) {
+        videoRef.current.pause();
+      }
+      setState("DETECTING");
+      pendingFrameRef.current = frameBlob;
+
+      // Call the detection API
+      const result = await detectInstrument(frameBlob);
+
+      if (!result.ok) {
+        // Network/timeout/server error
+        setErrorType("DETECTION_FAILED");
+        setErrorMessage(result.error.message);
+        setState("ERROR");
+        return;
+      }
+
+      const apiResponse = result.data;
+
+      if (!apiResponse.detected || !apiResponse.class) {
+        // Nothing detected above threshold
+        setState("NOT_DETECTED");
+        return;
+      }
+
+      // Resolve the YOLO class to a canonical instrument
+      const instrument = resolveInstrument(apiResponse.class, museumId);
+
+      if (!instrument) {
+        // Detected something but it doesn't match any known instrument
+        console.warn(`YOLO detected "${apiResponse.class}" but no matching instrument found`);
+        setState("NOT_DETECTED");
+        return;
+      }
+
+      // Successful detection — set the result and let state machine progress
+      setDetection({
+        instrument_id: instrument.id,
+        name: instrument.name.toUpperCase(),
+        category: instrument.category,
+        confidence: Math.round((apiResponse.confidence ?? 0) * 100),
+      });
+
+      // State is already DETECTING — the useEffect timer will advance to VERIFYING → DISCOVERED
+    },
+    [museumId]
+  );
 
   // Manual Trigger to Scan Current Physical Object
-  const handleManualScan = () => {
+  const handleManualScan = useCallback(() => {
     if (state !== "SCANNING") return;
+
     const { cropped, full } = captureCameraFrame();
-    setCapturedFrameUrl(cropped);
-    setFrozenFullFrameUrl(full);
-    if (videoRef.current) {
-      videoRef.current.pause();
+
+    // Convert the full frame to a blob for the API
+    const frameBlob = dataUrlToBlob(full);
+
+    performDetection(frameBlob, cropped, full);
+  }, [state, captureCameraFrame, performDetection]);
+
+  // Retry detection with the same pending frame
+  const handleRetryDetection = useCallback(() => {
+    if (pendingFrameRef.current) {
+      performDetection(
+        pendingFrameRef.current,
+        capturedFrameUrl,
+        frozenFullFrameUrl || capturedFrameUrl
+      );
+    } else {
+      // No pending frame — just reset to scanning
+      setFrozenFullFrameUrl(null);
+      if (videoRef.current) {
+        videoRef.current.play().catch(console.warn);
+      }
+      setErrorType(null);
+      setErrorMessage("");
+      setState("SCANNING");
     }
-    setDetection({
-      instrument_id: targetInstrument.id,
-      name: "VEENA",
-      category: "Strings · Tata Vadya",
-      confidence: 87,
-    });
-    setState("DETECTING");
-  };
+  }, [capturedFrameUrl, frozenFullFrameUrl, performDetection]);
 
   const handleClose = () => {
     if (streamRef.current) {
@@ -290,6 +364,9 @@ function ScannerContent() {
   const handleResetScan = () => {
     setIsPostScanActive(false);
     setFrozenFullFrameUrl(null);
+    setDetection(null);
+    setErrorType(null);
+    setErrorMessage("");
     if (videoRef.current) {
       videoRef.current.play().catch(console.warn);
     }
@@ -304,10 +381,9 @@ function ScannerContent() {
       videoRef.current.play().catch(console.warn);
     }
 
-    // Update discovered set (Veena is now marked discovered, bumping progress to 3/10)
+    // Update discovered set
     setDiscoveredIds((prev) => {
       const next = new Set(prev);
-      next.add("saraswati-veena");
       next.add(instrumentId);
       return next;
     });
@@ -317,7 +393,7 @@ function ScannerContent() {
       const supabase = createClient();
       await recordDiscovery(supabase, {
         museum_id: museumId,
-        instrument_id: targetInstrument.id,
+        instrument_id: instrumentId,
         source: "physical",
       });
     } catch {
@@ -326,6 +402,7 @@ function ScannerContent() {
 
     // Reveal collection drawer showing the new discovery
     setShowCollectionDrawer(true);
+    setDetection(null);
     setState("SCANNING");
   };
 
@@ -440,34 +517,67 @@ function ScannerContent() {
       <main className="z-10 flex-1 flex flex-col items-center justify-center px-4 relative my-auto">
         {state === "ERROR" ? (
           <div className="w-full max-w-sm p-5 rounded-2xl border border-white/20 bg-[#12141a]/95 backdrop-blur-2xl text-center shadow-2xl animate-fade-in">
-            <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mx-auto mb-3">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-              </svg>
+            <div className={`w-10 h-10 rounded-xl ${
+              errorType === "DETECTION_FAILED"
+                ? "bg-amber-500/10 border border-amber-500/30"
+                : "bg-rose-500/10 border border-rose-500/30"
+            } flex items-center justify-center mx-auto mb-3`}>
+              {errorType === "DETECTION_FAILED" ? (
+                <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+              )}
             </div>
 
             <h3 className="font-grotesque font-bold text-base text-white mb-1.5">
               {errorType === "CAMERA_DENIED"
                 ? "Camera Access Denied"
+                : errorType === "DETECTION_FAILED"
+                ? "Detection Unavailable"
                 : "Camera Feed Unavailable"}
             </h3>
 
             <p className="text-white/60 font-grotesque text-xs leading-relaxed mb-4">
               {errorType === "CAMERA_DENIED"
                 ? "Museum Melody requires camera access to recognize physical artefacts. Please allow camera permissions in your browser address bar or system settings."
+                : errorType === "DETECTION_FAILED"
+                ? errorMessage || "Could not reach the detection server. Please check that the backend is running and try again."
                 : "No video capture device was detected. Please check that your webcam or camera is connected and enabled."}
             </p>
 
-            <button
-              type="button"
-              onClick={() => {
-                setState("REQUESTING_CAMERA");
-                setRetryCount((c) => c + 1);
-              }}
-              className="btn-hero-fill w-full py-2.5 px-4 rounded-xl border border-white text-white font-grotesque text-xs font-bold uppercase tracking-wider cursor-pointer hover:border-[#ffc75a] hover:text-[#ffc75a]"
-            >
-              <span>Grant / Retry Camera</span>
-            </button>
+            {errorType === "DETECTION_FAILED" ? (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleRetryDetection}
+                  className="btn-hero-fill flex-1 py-2.5 px-4 rounded-xl border border-[#ffc75a] text-[#ffc75a] font-grotesque text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-[#ffc75a] hover:text-black transition-all"
+                >
+                  <span>Retry Detection</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetScan}
+                  className="py-2.5 px-4 rounded-xl border border-white/20 text-white/70 font-grotesque text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-white/10 transition-all"
+                >
+                  <span>Back</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setState("REQUESTING_CAMERA");
+                  setRetryCount((c) => c + 1);
+                }}
+                className="btn-hero-fill w-full py-2.5 px-4 rounded-xl border border-white text-white font-grotesque text-xs font-bold uppercase tracking-wider cursor-pointer hover:border-[#ffc75a] hover:text-[#ffc75a]"
+              >
+                <span>Grant / Retry Camera</span>
+              </button>
+            )}
           </div>
         ) : (
           <>
@@ -484,10 +594,34 @@ function ScannerContent() {
             </div>
 
             {/* Detected Instrument Bounding Box, Outline & Verification Badge */}
-            {(state === "DETECTING" ||
-              state === "VERIFYING" ||
-              state === "DISCOVERED") && (
-              <DetectionOverlay detection={detection} state={state} />
+            {detection &&
+              (state === "DETECTING" ||
+                state === "VERIFYING" ||
+                state === "DISCOVERED") && (
+                <DetectionOverlay detection={detection} state={state} />
+              )}
+
+            {/* NOT_DETECTED Overlay — "Couldn't identify, try again" */}
+            {state === "NOT_DETECTED" && (
+              <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+                <div className="animate-slide-up animate-shake p-5 rounded-2xl border border-white/20 bg-[#12141a]/95 backdrop-blur-2xl text-center shadow-2xl max-w-[280px]">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto mb-3">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                    </svg>
+                  </div>
+                  <h3 className="font-grotesque font-bold text-sm text-white mb-1">
+                    No Instrument Detected
+                  </h3>
+                  <p className="text-white/50 font-grotesque text-[11px] leading-relaxed m-0">
+                    No recognizable instrument was found. Returning to museum.
+                  </p>
+                  <div className="mt-3 flex items-center justify-center gap-1.5 text-[10px] font-mono text-white/30 uppercase tracking-widest">
+                    <div className="w-1 h-1 rounded-full bg-white/30 animate-pulse" />
+                    Returning to museum...
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Manual Scan Shutter Button */}
@@ -611,7 +745,7 @@ function ScannerContent() {
             <>
               <div className="w-1.5 h-1.5 rounded-full bg-[#ffc75a]" />
               <span className="text-[11px] sm:text-xs font-grotesque text-[#ffc75a] font-bold tracking-wide">
-                Instrument Detected • Verifying...
+                Analyzing frame • Identifying...
               </span>
             </>
           )}
@@ -625,11 +759,20 @@ function ScannerContent() {
             </>
           )}
 
-          {state === "DISCOVERED" && (
+          {state === "DISCOVERED" && detection && (
             <>
               <span className="text-emerald-400 text-xs font-bold">✓</span>
               <span className="text-[11px] sm:text-xs font-grotesque text-emerald-300 font-bold tracking-wide">
                 Verified: {detection.name}
+              </span>
+            </>
+          )}
+
+          {state === "NOT_DETECTED" && (
+            <>
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              <span className="text-[11px] sm:text-xs font-grotesque text-amber-300 tracking-wide">
+                No instrument detected — returning to museum...
               </span>
             </>
           )}
@@ -642,7 +785,7 @@ function ScannerContent() {
 
           {state === "ERROR" && (
             <span className="text-[11px] sm:text-xs font-grotesque text-rose-400 tracking-wide">
-              Sensor paused
+              {errorType === "DETECTION_FAILED" ? "Detection server unavailable" : "Sensor paused"}
             </span>
           )}
         </div>

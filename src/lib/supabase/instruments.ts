@@ -148,43 +148,11 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     display_order: 9,
   },
 
-  // CSMVS MUMBAI (csmvs)
+  // CSMVS MUMBAI (csmvs) — 10 instruments matching the YOLO detection model
   {
-    id: "saraswati-veena",
+    id: "tabla",
     museum_id: "csmvs",
-    name: "Saraswati Veena",
-    category: "Tata (String)",
-    description:
-      "Classical long-necked lute with twenty-four fixed brass frets, four melodic strings, and three rhythm drone strings.",
-    historical_context:
-      "Represented in ancient Indian stone sculptures from the 2nd century BCE, venerated as the embodiment of artistic wisdom.",
-    image_url: "/Assets/hero_elem-01.png",
-    audio_url: "/Assets/audio_01.png",
-    model_class: "saraswati_veena",
-    confidence_threshold: 0.8,
-    active: true,
-    display_order: 1,
-  },
-  {
-    id: "rudra-veena",
-    museum_id: "csmvs",
-    name: "Rudra Veena",
-    category: "Tata (String)",
-    description:
-      "The most sacred ancient Indian instrument, featuring two massive dried hollow gourds supporting a teakwood tubular dandi.",
-    historical_context:
-      "Named after Lord Shiva (Rudra), this instrument requires profound meditative breath control and produces unmatched deep acoustic overtones.",
-    image_url: "/Assets/hero_elem-02.png",
-    audio_url: "/Assets/audio_02.png",
-    model_class: "rudra_veena",
-    confidence_threshold: 0.8,
-    active: true,
-    display_order: 2,
-  },
-  {
-    id: "tabla-pair",
-    museum_id: "csmvs",
-    name: "Tabla & Dagga",
+    name: "Tabla",
     category: "Avanaddha (Percussion)",
     description:
       "A pair of hand drums combining a tuned wooden treble drum (dayan) with a rounded copper bass kettle drum (bayan).",
@@ -193,9 +161,57 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
     image_url: "/Assets/hero_elem-03.jpg",
     audio_url: "/Assets/audio_03.png",
     model_class: "tabla",
-    confidence_threshold: 0.8,
+    confidence_threshold: 0.75,
+    active: true,
+    display_order: 1,
+  },
+  {
+    id: "sitar",
+    museum_id: "csmvs",
+    name: "Sitar",
+    category: "Tata (String)",
+    description:
+      "A long-necked plucked lute with a gourd resonator, movable curved brass frets, and thirteen sympathetic strings that shimmer with every note.",
+    historical_context:
+      "Popularized globally by Pandit Ravi Shankar, the sitar evolved from the Persian setar and became the quintessential voice of Hindustani classical music.",
+    image_url: "/Assets/hero_elem-01.png",
+    audio_url: "/Assets/audio_01.png",
+    model_class: "sitar",
+    confidence_threshold: 0.75,
+    active: true,
+    display_order: 2,
+  },
+  {
+    id: "tanpura",
+    museum_id: "csmvs",
+    name: "Tanpura",
+    category: "Tata (String)",
+    description:
+      "The premier acoustic drone lute with four or five metal strings tuned to the tonic and fifth, providing the harmonic foundation for all classical performance.",
+    historical_context:
+      "For centuries the tanpura has been the indispensable acoustic canvas upon which every raga unfolds, its continuous drone enveloping musicians and audiences alike.",
+    image_url: "/Assets/hero_elem-02.png",
+    audio_url: "/Assets/audio_02.png",
+    model_class: "tanpura",
+    confidence_threshold: 0.75,
     active: true,
     display_order: 3,
+  },
+  {
+    id: "sarangi",
+    museum_id: "csmvs",
+    name: "Sarangi",
+    category: "Tata (String)",
+    description:
+      "A short-necked bowed instrument carved from a single block of tun wood, with a goat-skin soundboard and up to forty sympathetic strings.",
+    historical_context:
+      "Known as the instrument closest to the human voice, the sarangi was the principal accompaniment for vocal classical music and Kathak dance in Mughal courts.",
+    image_url: "/Assets/hero_elem-04.jpg",
+    audio_url: "/Assets/audio_01.png",
+    model_class: "sarangi",
+    confidence_threshold: 0.75,
+    active: true,
+    display_order: 4,
   },
   {
     id: "bansuri",
@@ -206,12 +222,12 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "A side-blown transverse flute handcrafted from special straight-grained hollow bamboo with six or seven finger holes.",
     historical_context:
       "Mentioned in the Natya Shastra as one of the divine acoustic instruments, capable of creating subtle vocal-like microtonal glides (meend).",
-    image_url: "/Assets/hero_elem-04.jpg",
-    audio_url: "/Assets/audio_01.png",
+    image_url: "/Assets/media_illustr.png",
+    audio_url: "/Assets/audio_02.png",
     model_class: "bansuri",
     confidence_threshold: 0.75,
     active: true,
-    display_order: 4,
+    display_order: 5,
   },
   {
     id: "shehnai",
@@ -222,44 +238,60 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "A conical wooden oboe fitted with a quadrupled reed and a flared brass bell, producing an intensely auspicious timbre.",
     historical_context:
       "Integral to Indian weddings, dawn temple ceremonies (Mangal Vadya), and classical stages throughout Maharashtra and western India.",
-    image_url: "/Assets/media_illustr.png",
-    audio_url: "/Assets/audio_02.png",
-    model_class: "shehnai",
-    confidence_threshold: 0.75,
-    active: true,
-    display_order: 5,
-  },
-  {
-    id: "esraj",
-    museum_id: "csmvs",
-    name: "Esraj",
-    category: "Tata (String)",
-    description:
-      "A bowed string instrument combining the skin-covered soundbox of a sarangi with the fretted neck of a sitar.",
-    historical_context:
-      "Popularized in 19th-century musical gatherings and devotional Rabindra Sangeet, known for its warm, poignant vocal resonance.",
     image_url: "/Assets/visit-illustr.png",
     audio_url: "/Assets/audio_03.png",
-    model_class: "esraj",
+    model_class: "shehnai",
     confidence_threshold: 0.75,
     active: true,
     display_order: 6,
   },
   {
-    id: "jaltarang",
+    id: "pakhawaj",
     museum_id: "csmvs",
-    name: "Jaltarang",
-    category: "Ghana (Idiophone)",
+    name: "Pakhawaj",
+    category: "Avanaddha (Percussion)",
     description:
-      "A tuned acoustic array of porcelain china bowls filled with varying depths of water and struck with slender bamboo wands.",
+      "An ancient two-headed asymmetrical barrel drum tuned with moistened wheat-dough paste to generate thunderous low frequencies.",
     historical_context:
-      "First documented in Vatsyayana’s Kama Sutra as one of the 64 classical arts, turning liquid levels into delicate melodic vibrations.",
+      "The sacred rhythmic spine of Dhrupad traditions and temple kirtans, played horizontally across the lap with both palms.",
     image_url: "/Assets/audio_01.png",
     audio_url: "/Assets/audio_01.png",
-    model_class: "jaltarang",
+    model_class: "pakhawaj",
     confidence_threshold: 0.75,
     active: true,
     display_order: 7,
+  },
+  {
+    id: "harmonium",
+    museum_id: "csmvs",
+    name: "Harmonium",
+    category: "Sushira (Wind)",
+    description:
+      "A portable keyboard reed organ with hand-pumped bellows, producing sustained notes through tuned brass reeds activated by finger keys.",
+    historical_context:
+      "Introduced to India in the 19th century, the harmonium was adapted into a floor-seated instrument and became central to bhajan, qawwali, and light classical music.",
+    image_url: "/Assets/audio_02.png",
+    audio_url: "/Assets/audio_02.png",
+    model_class: "harmonium",
+    confidence_threshold: 0.75,
+    active: true,
+    display_order: 8,
+  },
+  {
+    id: "santoor",
+    museum_id: "csmvs",
+    name: "Santoor",
+    category: "Tata (String)",
+    description:
+      "A trapezoidal wooden box strung with dozens of metal strings, struck using delicate curved walnut-wood mallets.",
+    historical_context:
+      "Originally an ancient hundred-stringed lute (Shatatantri Veena) evolved into a celebrated acoustic instrument known for crystalline ripples of sound.",
+    image_url: "/Assets/audio_03.png",
+    audio_url: "/Assets/audio_03.png",
+    model_class: "santoor",
+    confidence_threshold: 0.75,
+    active: true,
+    display_order: 9,
   },
   {
     id: "sarod",
@@ -270,12 +302,12 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "A deep, waist-carved lute featuring a seamless goat-skin soundboard and a fretless polished chrome steel fingerboard.",
     historical_context:
       "Evolved from the Central Asian Afghan rubab, celebrated for explosive acoustic attacks and continuous sliding melodic ornamentations.",
-    image_url: "/Assets/audio_02.png",
-    audio_url: "/Assets/audio_02.png",
+    image_url: "/Assets/hero_elem-01.png",
+    audio_url: "/Assets/audio_01.png",
     model_class: "sarod",
     confidence_threshold: 0.75,
     active: true,
-    display_order: 8,
+    display_order: 10,
   },
 
   // DR. BHAU DAJI LAD MUMBAI CITY MUSEUM (bhau-daji-lad)
