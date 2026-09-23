@@ -12,7 +12,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "An exquisite 19th-century bowed instrument sculpted in the likeness of a royal peacock, with peacock feathers and carved plumage.",
     historical_context:
       "Prominently preserved in Maharashtra and Punjab royal courts, its peacock body symbolizes Saraswati while sympathetic strings produce an ethereal choral resonance.",
-    image_url: "/Assets/hero_elem-01.png",
+    image_url: "/sample/sitar.jpeg",
     audio_url: "/Assets/audio_01.png",
     model_class: "mayuri_veena",
     confidence_threshold: 0.75,
@@ -29,7 +29,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "The premier acoustic drone lute carved from carefully cured gourds harvested along the Krishna River in Miraj, Maharashtra.",
     historical_context:
       "For more than two centuries, the artisan guilds of Miraj have crafted tanpuras that provide the acoustic foundation for Indian classical maestros.",
-    image_url: "/Assets/hero_elem-02.png",
+    image_url: "/sample/tanpura.jpeg",
     audio_url: "/Assets/audio_02.png",
     model_class: "tanpura",
     confidence_threshold: 0.8,
@@ -46,7 +46,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "A dramatic curved C-shaped brass trumpet whose piercing calls reverberate across mountain passes and fortress battlements.",
     historical_context:
       "The revered acoustic herald of Chhatrapati Shivaji Maharaj’s Maratha empire, sounded to announce royal arrivals, auspicious ceremonies, and battle rallying.",
-    image_url: "/Assets/hero_elem-03.jpg",
+    image_url: "/sample/shehnai.jpeg",
     audio_url: "/Assets/audio_03.png",
     model_class: "tutari",
     confidence_threshold: 0.8,
@@ -63,7 +63,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "An ancient two-headed asymmetrical barrel drum tuned with moistened wheat-dough paste to generate thunderous low frequencies.",
     historical_context:
       "The sacred rhythmic spine of Maharashtra’s Warkari Vithoba kirtans, Sant Dnyaneshwar chants, and temple Dhrupad traditions.",
-    image_url: "/Assets/media_illustr.png",
+    image_url: "/sample/pakhawaz.jpeg",
     audio_url: "/Assets/audio_01.png",
     model_class: "pakhawaj",
     confidence_threshold: 0.75,
@@ -80,7 +80,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "A high-pitched double-reed woodwind developed in Solapur, smaller than a shehnai yet possessing exceptional melodic agility.",
     historical_context:
       "Invented in the 1930s by master artisan Baburao Jadhav in Solapur, Maharashtra, becoming a rare gem of regional wind craft.",
-    image_url: "/Assets/hero_elem-04.jpg",
+    image_url: "/sample/shehnai.jpeg",
     audio_url: "/Assets/audio_02.png",
     model_class: "sundari",
     confidence_threshold: 0.75,
@@ -97,7 +97,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "An ancient tribal horn constructed from a dried bottle gourd, bamboo pipes, and tightly wound palm leaf funnel.",
     historical_context:
       "Sacred instrument of the Warli indigenous community in northern Maharashtra, played at harvest celebrations where villagers dance in spiral cosmic circles.",
-    image_url: "/Assets/visit-illustr.png",
+    image_url: "/sample/bansuri.jpeg",
     audio_url: "/Assets/audio_03.png",
     model_class: "tarpa",
     confidence_threshold: 0.75,
@@ -114,7 +114,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "A rustic single-string rhythm-drone instrument made from a wooden or tin cylinder with a parchment membrane.",
     historical_context:
       "Essential accompaniment for Maharashtra’s Gondhali balladeers and Shahiri Powada bards who narrate heroic legends of Maratha warriors.",
-    image_url: "/Assets/audio_01.png",
+    image_url: "/sample/tanpura.jpeg",
     audio_url: "/Assets/audio_01.png",
     model_class: "tuntuna",
     confidence_threshold: 0.75,
@@ -131,7 +131,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "A high-tension wooden folk drum with tuned iron paste (masala) on the treble skin, producing rapid sharp slaps.",
     historical_context:
       "The electrifying pulse of Maharashtra’s Lavani folk dance and Tamasha theatre traditions across Deccan villages and historic arenas.",
-    image_url: "/Assets/audio_02.png",
+    image_url: "/sample/pakhawaz.jpeg",
     audio_url: "/Assets/audio_02.png",
     model_class: "dholki",
     confidence_threshold: 0.8,
@@ -148,7 +148,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "A trapezoidal wooden box strung with dozens of metal strings, struck using delicate curved walnut-wood mallets.",
     historical_context:
       "Originally an ancient hundred-stringed lute (Shatatantri Veena) evolved into a celebrated acoustic instrument known for crystalline ripples of sound.",
-    image_url: "/Assets/audio_03.png",
+    image_url: "/sample/santoor.jpeg",
     audio_url: "/Assets/audio_03.png",
     model_class: "santoor",
     confidence_threshold: 0.75,
@@ -167,7 +167,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "A pair of hand drums combining a tuned wooden treble drum (dayan) with a rounded copper bass kettle drum (bayan).",
     historical_context:
       "Developed in 18th-century courtly musical dialogues, the tabla is recognized worldwide for its intricate rhythmic syllables (bols).",
-    image_url: "/Assets/hero_elem-03.jpg",
+    image_url: "/sample/tabla.jpeg",
     audio_url: "/Assets/audio_03.png",
     model_class: "tabla",
     confidence_threshold: 0.75,
@@ -184,7 +184,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "A long-necked plucked lute with a gourd resonator, movable curved brass frets, and thirteen sympathetic strings that shimmer with every note.",
     historical_context:
       "Popularized globally by Pandit Ravi Shankar, the sitar evolved from the Persian setar and became the quintessential voice of Hindustani classical music.",
-    image_url: "/Assets/hero_elem-01.png",
+    image_url: "/sample/sitar.jpeg",
     audio_url: "/Assets/audio_01.png",
     model_class: "sitar",
     confidence_threshold: 0.75,
@@ -201,7 +201,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "The premier acoustic drone lute with four or five metal strings tuned to the tonic and fifth, providing the harmonic foundation for all classical performance.",
     historical_context:
       "For centuries the tanpura has been the indispensable acoustic canvas upon which every raga unfolds, its continuous drone enveloping musicians and audiences alike.",
-    image_url: "/Assets/hero_elem-02.png",
+    image_url: "/sample/tanpura.jpeg",
     audio_url: "/Assets/audio_02.png",
     model_class: "tanpura",
     confidence_threshold: 0.75,
@@ -218,7 +218,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "A short-necked bowed instrument carved from a single block of tun wood, with a goat-skin soundboard and up to forty sympathetic strings.",
     historical_context:
       "Known as the instrument closest to the human voice, the sarangi was the principal accompaniment for vocal classical music and Kathak dance in Mughal courts.",
-    image_url: "/Assets/hero_elem-04.jpg",
+    image_url: "/sample/sarangi.jpeg",
     audio_url: "/Assets/audio_01.png",
     model_class: "sarangi",
     confidence_threshold: 0.75,
@@ -235,7 +235,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "A side-blown transverse flute handcrafted from special straight-grained hollow bamboo with six or seven finger holes.",
     historical_context:
       "Mentioned in the Natya Shastra as one of the divine acoustic instruments, capable of creating subtle vocal-like microtonal glides (meend).",
-    image_url: "/Assets/media_illustr.png",
+    image_url: "/sample/bansuri.jpeg",
     audio_url: "/Assets/audio_02.png",
     model_class: "bansuri",
     confidence_threshold: 0.75,
@@ -252,7 +252,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "A conical wooden oboe fitted with a quadrupled reed and a flared brass bell, producing an intensely auspicious timbre.",
     historical_context:
       "Integral to Indian weddings, dawn temple ceremonies (Mangal Vadya), and classical stages throughout Maharashtra and western India.",
-    image_url: "/Assets/visit-illustr.png",
+    image_url: "/sample/shehnai.jpeg",
     audio_url: "/Assets/audio_03.png",
     model_class: "shehnai",
     confidence_threshold: 0.75,
@@ -269,7 +269,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "An ancient two-headed asymmetrical barrel drum tuned with moistened wheat-dough paste to generate thunderous low frequencies.",
     historical_context:
       "The sacred rhythmic spine of Dhrupad traditions and temple kirtans, played horizontally across the lap with both palms.",
-    image_url: "/Assets/audio_01.png",
+    image_url: "/sample/pakhawaz.jpeg",
     audio_url: "/Assets/audio_01.png",
     model_class: "pakhawaj",
     confidence_threshold: 0.75,
@@ -286,7 +286,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "A portable keyboard reed organ with hand-pumped bellows, producing sustained notes through tuned brass reeds activated by finger keys.",
     historical_context:
       "Introduced to India in the 19th century, the harmonium was adapted into a floor-seated instrument and became central to bhajan, qawwali, and light classical music.",
-    image_url: "/Assets/audio_02.png",
+    image_url: "/sample/harmonium.jpeg",
     audio_url: "/Assets/audio_02.png",
     model_class: "harmonium",
     confidence_threshold: 0.75,
@@ -303,7 +303,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "A trapezoidal wooden box strung with dozens of metal strings, struck using delicate curved walnut-wood mallets.",
     historical_context:
       "Originally an ancient hundred-stringed lute (Shatatantri Veena) evolved into a celebrated acoustic instrument known for crystalline ripples of sound.",
-    image_url: "/Assets/audio_03.png",
+    image_url: "/sample/santoor.jpeg",
     audio_url: "/Assets/audio_03.png",
     model_class: "santoor",
     confidence_threshold: 0.75,
@@ -320,7 +320,7 @@ export const CANONICAL_INSTRUMENTS: Instrument[] = [
       "A deep, waist-carved lute featuring a seamless goat-skin soundboard and a fretless polished chrome steel fingerboard.",
     historical_context:
       "Evolved from the Central Asian Afghan rubab, celebrated for explosive acoustic attacks and continuous sliding melodic ornamentations.",
-    image_url: "/Assets/hero_elem-01.png",
+    image_url: "/sample/sarod.jpeg",
     audio_url: "/Assets/audio_01.png",
     model_class: "sarod",
     confidence_threshold: 0.75,

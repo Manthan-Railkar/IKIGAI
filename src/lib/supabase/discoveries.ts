@@ -7,14 +7,99 @@ import {
 } from "@/types/discovery";
 import { getInstrumentsByMuseum } from "./instruments";
 
+const LOCAL_DISCOVERIES_KEY = "mm_discovered_instruments_v1";
+
+interface LocalDiscoveryRecord {
+  instrument_id: string;
+  museum_id: string;
+  discovered_at: string;
+  source: DiscoverySource;
+}
+
+/**
+ * Get all discoveries stored in localStorage for guest/offline support.
+ */
+export function getLocalDiscoveries(museumId?: string): Discovery[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_DISCOVERIES_KEY);
+    if (!raw) return [];
+    const list: LocalDiscoveryRecord[] = JSON.parse(raw);
+    return list
+      .filter((item) => !museumId || item.museum_id === museumId || museumId === "kelkar-museum" || item.museum_id === "csmvs")
+      .map((item) => ({
+        id: `local-${item.instrument_id}`,
+        user_id: "local-user",
+        museum_id: item.museum_id,
+        instrument_id: item.instrument_id,
+        source: item.source,
+        discovered_at: item.discovered_at,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Save a discovery to localStorage synchronously and dispatch an update event.
+ */
+export function saveLocalDiscovery(
+  instrumentId: string,
+  museumId: string,
+  source: DiscoverySource = "physical"
+): Discovery {
+  const now = new Date().toISOString();
+  const fallbackItem: Discovery = {
+    id: `local-${instrumentId}`,
+    user_id: "local-user",
+    museum_id: museumId,
+    instrument_id: instrumentId,
+    source,
+    discovered_at: now,
+  };
+
+  if (typeof window === "undefined") return fallbackItem;
+  try {
+    const raw = localStorage.getItem(LOCAL_DISCOVERIES_KEY);
+    const list: LocalDiscoveryRecord[] = raw ? JSON.parse(raw) : [];
+    const existing = list.find((item) => item.instrument_id === instrumentId);
+    if (!existing) {
+      list.push({
+        instrument_id: instrumentId,
+        museum_id: museumId,
+        discovered_at: now,
+        source,
+      });
+      localStorage.setItem(LOCAL_DISCOVERIES_KEY, JSON.stringify(list));
+      window.dispatchEvent(
+        new CustomEvent("mm_discovery_updated", {
+          detail: { instrumentId, museumId },
+        })
+      );
+    }
+  } catch (e) {
+    console.warn("Failed to persist local discovery:", e);
+  }
+  return fallbackItem;
+}
+
+/**
+ * Get the set of discovered instrument IDs from localStorage.
+ */
+export function getLocalDiscoveredIds(museumId?: string): Set<string> {
+  const list = getLocalDiscoveries(museumId);
+  return new Set(list.map((d) => d.instrument_id));
+}
+
 /**
  * Retrieves all discoveries for the currently authenticated user,
- * optionally filtered by museum ID.
+ * optionally filtered by museum ID. Also merges with localStorage discoveries.
  */
 export async function getUserDiscoveries(
   supabase: SupabaseClient,
   museumId?: string
 ): Promise<Discovery[]> {
+  const localList = getLocalDiscoveries(museumId);
   try {
     const {
       data: { user },
@@ -22,7 +107,7 @@ export async function getUserDiscoveries(
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return [];
+      return localList;
     }
 
     let query = supabase
@@ -39,20 +124,27 @@ export async function getUserDiscoveries(
 
     if (error || !data) {
       console.warn("Could not load user discoveries:", error?.message);
-      return [];
+      return localList;
     }
 
-    return data as Discovery[];
+    const merged = new Map<string, Discovery>();
+    data.forEach((d) => merged.set(d.instrument_id, d as Discovery));
+    localList.forEach((d) => {
+      if (!merged.has(d.instrument_id)) {
+        merged.set(d.instrument_id, d);
+      }
+    });
+
+    return Array.from(merged.values());
   } catch (err) {
     console.warn("Exception fetching user discoveries:", err);
-    return [];
+    return localList;
   }
 }
 
 /**
  * Record a discovery idempotently.
- * If the user has already discovered this instrument, it returns the existing discovery with was_new: false.
- * If new, creates the discovery and returns was_new: true.
+ * Always saves to localStorage immediately and syncs with Supabase when available.
  */
 export async function recordDiscovery(
   supabase: SupabaseClient,
@@ -62,6 +154,9 @@ export async function recordDiscovery(
     source: DiscoverySource;
   }
 ): Promise<{ discovery: Discovery | null; was_new: boolean; error: Error | null }> {
+  // Always persist to localStorage first so discoveries are never lost
+  const localDisc = saveLocalDiscovery(params.instrument_id, params.museum_id, params.source);
+
   try {
     const {
       data: { user },
@@ -70,9 +165,9 @@ export async function recordDiscovery(
 
     if (authError || !user) {
       return {
-        discovery: null,
-        was_new: false,
-        error: authError || new Error("User not authenticated"),
+        discovery: localDisc,
+        was_new: true,
+        error: null,
       };
     }
 
@@ -156,7 +251,9 @@ export async function getMuseumCollectionStatus(
 
   const enrichedInstruments: InstrumentWithDiscoveryStatus[] = instruments.map(
     (inst) => {
-      const discovery = discoveryMap.get(inst.id);
+      const discovery =
+        discoveryMap.get(inst.id) ||
+        (inst.model_class ? discoveryMap.get(inst.model_class) : undefined);
       return {
         ...inst,
         is_discovered: Boolean(discovery),

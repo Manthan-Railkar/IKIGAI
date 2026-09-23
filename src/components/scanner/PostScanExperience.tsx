@@ -6,6 +6,10 @@ import { NoteEvent, soundEngine } from "@/lib/audio/soundEngine";
 import { sampleEngine } from "@/lib/audio/sampleEngine";
 import { sessionRecorder } from "@/lib/audio/sessionRecorder";
 import { Instrument } from "@/types/instrument";
+import { getSampleImagePath } from "@/lib/sampleImages";
+import { saveLocalDiscovery, getLocalDiscoveredIds, recordDiscovery } from "@/lib/supabase/discoveries";
+import { createClient } from "@/lib/supabase/client";
+import { CANONICAL_INSTRUMENTS } from "@/lib/supabase/instruments";
 import AudioWaveform from "./AudioWaveform";
 import PlayableStrings from "./PlayableStrings";
 import PlayableTiles from "./PlayableTiles";
@@ -48,6 +52,19 @@ const DEFAULT_INSTRUMENT: Instrument = {
   interaction: "strings",
 };
 
+const PLAYABLE_INSTRUMENTS = [
+  { id: "tabla", name: "Tabla", category: "Avanaddha (Percussion)", interaction: "tiles" as const, model_class: "tabla" },
+  { id: "sitar", name: "Sitar", category: "Tata (String)", interaction: "strings" as const, model_class: "sitar" },
+  { id: "tanpura", name: "Tanpura", category: "Tata (String)", interaction: "strings" as const, model_class: "tanpura" },
+  { id: "sarangi", name: "Sarangi", category: "Tata (String)", interaction: "strings" as const, model_class: "sarangi" },
+  { id: "bansuri", name: "Bansuri", category: "Sushira (Wind)", interaction: "tiles" as const, model_class: "bansuri" },
+  { id: "shehnai", name: "Shehnai", category: "Sushira (Wind)", interaction: "tiles" as const, model_class: "shehnai" },
+  { id: "pakhawaj", name: "Pakhawaj", category: "Avanaddha (Percussion)", interaction: "tiles" as const, model_class: "pakhawaj" },
+  { id: "harmonium", name: "Harmonium", category: "Sushira (Wind)", interaction: "tiles" as const, model_class: "harmonium" },
+  { id: "santoor", name: "Santoor", category: "Tata (String)", interaction: "tiles" as const, model_class: "santoor" },
+  { id: "sarod", name: "Sarod", category: "Tata (String)", interaction: "strings" as const, model_class: "sarod" },
+];
+
 export default function PostScanExperience({
   onReturnToScanner,
   museumName = "Museum Heritage Collection",
@@ -56,8 +73,63 @@ export default function PostScanExperience({
   instrument = DEFAULT_INSTRUMENT,
   className = "",
 }: PostScanExperienceProps) {
-  const activeInstrument = instrument || DEFAULT_INSTRUMENT;
+  const [selectedInstrument, setSelectedInstrument] = useState<Instrument>(instrument || DEFAULT_INSTRUMENT);
+  const activeInstrument = selectedInstrument;
   const [currentStep, setCurrentStep] = useState<PostScanStep>(initialStep);
+
+  useEffect(() => {
+    if (instrument) {
+      setSelectedInstrument(instrument);
+    }
+  }, [instrument]);
+
+  const [isSavedInCollection, setIsSavedInCollection] = useState<boolean>(false);
+
+  useEffect(() => {
+    const local = getLocalDiscoveredIds(activeInstrument.museum_id);
+    setIsSavedInCollection(
+      local.has(activeInstrument.id) ||
+      (activeInstrument.model_class ? local.has(activeInstrument.model_class) : false)
+    );
+  }, [activeInstrument]);
+
+  const handleSaveInstrument = useCallback(() => {
+    saveLocalDiscovery(activeInstrument.id, activeInstrument.museum_id || "csmvs", "physical");
+    try {
+      const supabase = createClient();
+      recordDiscovery(supabase, {
+        museum_id: activeInstrument.museum_id || "csmvs",
+        instrument_id: activeInstrument.id,
+        source: "physical",
+      }).catch(console.warn);
+    } catch (e) {
+      console.warn(e);
+    }
+    setIsSavedInCollection(true);
+  }, [activeInstrument]);
+
+  const handleSelectInstrument = (instId: string) => {
+    soundEngine.stopCuratedRaga();
+    soundEngine.stopDrone();
+    const found = CANONICAL_INSTRUMENTS.find((i) => i.id === instId);
+    if (found) {
+      setSelectedInstrument(found);
+      sampleEngine.loadInstrument(found.id);
+    } else {
+      const info = PLAYABLE_INSTRUMENTS.find((p) => p.id === instId);
+      if (info) {
+        setSelectedInstrument({
+          ...DEFAULT_INSTRUMENT,
+          id: info.id,
+          name: info.name,
+          category: info.category,
+          interaction: info.interaction,
+          model_class: info.model_class,
+        });
+        sampleEngine.loadInstrument(info.id);
+      }
+    }
+  };
 
   // Hear It playback state
   const [isHearItPlaying, setIsHearItPlaying] = useState(false);
@@ -255,7 +327,10 @@ export default function PostScanExperience({
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   };
 
-  const displayImage = activeInstrument.image_url || "/Assets/veena_reveal.jpg";
+  const displayImage =
+    getSampleImagePath(activeInstrument.model_class || activeInstrument.id) ||
+    activeInstrument.image_url ||
+    "/sample/sitar.jpeg";
 
   return (
     <div
@@ -294,22 +369,12 @@ export default function PostScanExperience({
         {currentStep === "DETECTION_COMPLETE" && (
           <div className="relative w-full max-w-md mx-auto flex flex-col items-center animate-fade-in py-1">
             <div className="relative w-[270px] h-[340px] sm:w-[340px] sm:h-[420px] rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.9),0_0_35px_rgba(255,199,90,0.35)] border-2 border-[#ffc75a]">
-              {capturedFrameUrl.startsWith("data:") ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={capturedFrameUrl}
-                  alt="Detected Camera Frame"
-                  className="w-full h-full object-cover filter brightness-95"
-                />
-              ) : (
-                <Image
-                  src={capturedFrameUrl}
-                  alt="Detected Artefact"
-                  fill
-                  priority
-                  className="object-cover object-center filter brightness-95"
-                />
-              )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={capturedFrameUrl}
+                alt="Detected Artefact"
+                className="w-full h-full object-cover filter brightness-95"
+              />
 
               {/* Bounding Box Warm Gold Corner Brackets */}
               <div className="absolute top-2 left-2 w-6 h-6 sm:w-7 sm:h-7 border-t-2 border-l-2 border-[#ffc75a] shadow-[0_0_12px_#ffc75a]" />
@@ -378,15 +443,13 @@ export default function PostScanExperience({
               {activeInstrument.category} · Authentic Sound
             </div>
 
-            <div className="relative w-full max-w-[280px] sm:max-w-sm h-48 sm:h-64 md:h-72 rounded-xl sm:rounded-2xl overflow-hidden border border-white/20 shadow-[0_15px_40px_rgba(0,0,0,0.85),0_0_30px_rgba(255,199,90,0.25)] mb-3 sm:mb-4 group">
-              <Image
+            <div className="relative w-full max-w-[280px] sm:max-w-sm h-52 sm:h-64 md:h-72 rounded-xl sm:rounded-2xl overflow-hidden border-2 border-[#ffc75a]/50 shadow-[0_15px_40px_rgba(0,0,0,0.85),0_0_30px_rgba(255,199,90,0.25)] mb-3 sm:mb-4 bg-[#0a0c10] group flex items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
                 src={displayImage}
                 alt={activeInstrument.name}
-                fill
-                priority
-                className="object-cover object-center transition-transform duration-700 group-hover:scale-105"
+                className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105 filter brightness-100"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0d0f12] via-transparent to-transparent" />
             </div>
 
             <div className="max-w-sm sm:max-w-md text-white/70 font-grotesque text-xs sm:text-sm leading-relaxed mb-4 sm:mb-5 space-y-1.5 sm:space-y-2 px-2">
@@ -494,14 +557,45 @@ export default function PostScanExperience({
               </span>
             </div>
 
-            <div className="mb-2.5 sm:mb-3.5 w-full max-w-xs flex justify-center">
+            {/* Instrument Manual Switcher */}
+            <div className="flex items-center justify-between w-full max-w-xs mb-2.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
+              <span className="text-[10px] font-mono uppercase text-white/50 tracking-wider">
+                Switch:
+              </span>
+              <select
+                value={activeInstrument.id}
+                onChange={(e) => handleSelectInstrument(e.target.value)}
+                className="bg-[#12141a] text-xs font-grotesque font-bold text-[#ffc75a] border border-[#ffc75a]/30 rounded-lg px-2 py-0.5 outline-none cursor-pointer"
+              >
+                {PLAYABLE_INSTRUMENTS.map((inst) => (
+                  <option key={inst.id} value={inst.id} className="bg-[#12141a] text-white">
+                    {inst.name.toUpperCase()} ({inst.category.split(" ")[0]})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Action Buttons: Record & Save to Collection */}
+            <div className="mb-2.5 sm:mb-3.5 w-full max-w-xs flex items-center justify-center gap-2">
               <button
                 type="button"
                 onClick={handleStartRecording}
-                className="w-full min-h-[44px] flex items-center justify-center gap-2 py-2.5 px-6 rounded-full border border-rose-500/60 bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 text-rose-300 hover:text-rose-100 font-grotesque text-xs font-bold uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(244,63,94,0.3)] cursor-pointer"
+                className="flex-1 min-h-[42px] flex items-center justify-center gap-1.5 py-2 px-3 rounded-full border border-rose-500/60 bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 text-rose-300 hover:text-rose-100 font-grotesque text-xs font-bold uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(244,63,94,0.25)] cursor-pointer"
               >
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
-                <span>● RECORD PERFORMANCE</span>
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                <span>● Record</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveInstrument}
+                className={`flex-1 min-h-[42px] flex items-center justify-center gap-1.5 py-2 px-3 rounded-full border transition-all cursor-pointer ${
+                  isSavedInCollection
+                    ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                    : "border-[#ffc75a]/60 bg-[#ffc75a]/15 hover:bg-[#ffc75a]/25 text-[#ffc75a] shadow-[0_0_15px_rgba(255,199,90,0.2)] active:scale-95"
+                } font-grotesque text-xs font-bold uppercase tracking-wider`}
+              >
+                <span>{isSavedInCollection ? "✓ In Collection" : "💾 Save to Museum"}</span>
               </button>
             </div>
 

@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getMuseumById } from "@/lib/supabase/museums";
 import { getMuseumCollectionStatus } from "@/lib/supabase/discoveries";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { getSampleImagePath } from "@/lib/sampleImages";
 import { Museum } from "@/types/museum";
 import {
   MuseumCollectionStatus,
@@ -52,6 +53,23 @@ export default function MuseumCollectionPage() {
     if (museumId) {
       loadData();
     }
+
+    // Refresh collection when user returns to this tab or when discoveries are updated
+    const handleRefresh = () => {
+      getMuseumCollectionStatus(supabase, museumId).then((data) => {
+        setCollection(data);
+      });
+    };
+
+    window.addEventListener("focus", handleRefresh);
+    window.addEventListener("storage", handleRefresh);
+    window.addEventListener("mm_discovery_updated", handleRefresh);
+
+    return () => {
+      window.removeEventListener("focus", handleRefresh);
+      window.removeEventListener("storage", handleRefresh);
+      window.removeEventListener("mm_discovery_updated", handleRefresh);
+    };
   }, [museumId, supabase]);
 
   // Derive unique categories present in this collection
@@ -382,18 +400,21 @@ function DiscoveredInstrumentCard({
 }: {
   instrument: InstrumentWithDiscoveryStatus;
 }) {
+  const cardImg =
+    getSampleImagePath(instrument.model_class || instrument.id) ||
+    instrument.image_url;
+
   return (
     <div className="group relative flex flex-col justify-between rounded-2xl border border-white/20 bg-[#15181e]/85 backdrop-blur-md overflow-hidden hover:border-[#ffc75a]/70 transition-all duration-300 hover:shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(255,199,90,0.2)]">
       {/* Instrument Image */}
       <div className="relative w-full h-56 bg-black/40 overflow-hidden">
-        <Image
-          src={instrument.image_url}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={cardImg}
           alt={instrument.name}
-          fill
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#15181e] via-transparent to-black/30" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#15181e] via-transparent to-black/30 pointer-events-none" />
 
         {/* Status Badge */}
         <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono uppercase font-bold tracking-wider backdrop-blur-md">

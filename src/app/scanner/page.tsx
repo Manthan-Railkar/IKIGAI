@@ -12,9 +12,14 @@ import { Instrument } from "@/types/instrument";
 import { CANONICAL_INSTRUMENTS } from "@/lib/supabase/instruments";
 import { CANONICAL_MUSEUMS } from "@/lib/supabase/museums";
 import { createClient } from "@/lib/supabase/client";
-import { recordDiscovery } from "@/lib/supabase/discoveries";
+import {
+  recordDiscovery,
+  getLocalDiscoveredIds,
+  getUserDiscoveries,
+} from "@/lib/supabase/discoveries";
 import { detectInstrument, dataUrlToBlob } from "@/lib/detectionApi";
 import { resolveInstrument } from "@/lib/classMap";
+import { getSampleImagePath } from "@/lib/sampleImages";
 
 interface CollectionItem {
   id: string;
@@ -61,6 +66,32 @@ function ScannerContent() {
   // Track discovered instruments for the museum collection loop
   const [discoveredIds, setDiscoveredIds] = useState<Set<string>>(new Set());
 
+  // Load initially discovered IDs from localStorage and Supabase
+  useEffect(() => {
+    const local = getLocalDiscoveredIds(museumId);
+    setDiscoveredIds(local);
+
+    getUserDiscoveries(createClient(), museumId).then((discoveries) => {
+      setDiscoveredIds((prev) => {
+        const next = new Set(prev);
+        discoveries.forEach((d) => next.add(d.instrument_id));
+        return next;
+      });
+    });
+
+    const handleUpdate = () => {
+      const updated = getLocalDiscoveredIds(museumId);
+      setDiscoveredIds((prev) => {
+        const next = new Set(prev);
+        updated.forEach((id) => next.add(id));
+        return next;
+      });
+    };
+
+    window.addEventListener("mm_discovery_updated", handleUpdate);
+    return () => window.removeEventListener("mm_discovery_updated", handleUpdate);
+  }, [museumId]);
+
   // The 10 YOLO model target classes — shown in collection drawer
   const museumCollection: CollectionItem[] = useMemo(() => {
     const yoloTargets = [
@@ -78,7 +109,9 @@ function ScannerContent() {
 
     return yoloTargets.map((inst) => ({
       ...inst,
-      isDiscovered: discoveredIds.has(inst.id),
+      isDiscovered:
+        discoveredIds.has(inst.id) ||
+        (inst.id === "pakhawaz" && discoveredIds.has("pakhawaj")),
     }));
   }, [discoveredIds]);
 
@@ -88,6 +121,7 @@ function ScannerContent() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isUploadRef = useRef<boolean>(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const scanIdleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -279,7 +313,13 @@ function ScannerContent() {
    * This is the core detection flow — called by both manual scan and retry.
    */
   const performDetection = useCallback(
-    async (frameBlob: Blob, croppedUrl: string, fullUrl: string) => {
+    async (
+      frameBlob: Blob,
+      croppedUrl: string,
+      fullUrl: string,
+      isUpload: boolean = false
+    ) => {
+      isUploadRef.current = isUpload;
       // Freeze the camera and show scanning animation
       setCapturedFrameUrl(croppedUrl);
       setFrozenFullFrameUrl(fullUrl);
@@ -318,6 +358,20 @@ function ScannerContent() {
         return;
       }
 
+      // Pre-animation and transition image selection:
+      // - Upload: Keep the exact user-uploaded image
+      // - Live Scanner: Use authentic sample image of the detected instrument from /sample/
+      if (isUpload) {
+        setCapturedFrameUrl(croppedUrl);
+        setFrozenFullFrameUrl(fullUrl);
+      } else {
+        const sampleImg = getSampleImagePath(
+          instrument.model_class || apiResponse.class || instrument.id
+        );
+        setCapturedFrameUrl(sampleImg);
+        setFrozenFullFrameUrl(sampleImg);
+      }
+
       // Successful detection — set the result and let state machine progress
       setDetectedInstrument(instrument);
       setDetection({
@@ -326,6 +380,20 @@ function ScannerContent() {
         category: instrument.category,
         confidence: Math.round((apiResponse.confidence ?? 0) * 100),
       });
+
+      // Update discovered set immediately in state AND localStorage AND Supabase
+      setDiscoveredIds((prev) => {
+        const next = new Set(prev);
+        next.add(instrument.id);
+        if (instrument.model_class) next.add(instrument.model_class);
+        return next;
+      });
+
+      recordDiscovery(createClient(), {
+        museum_id: museumId,
+        instrument_id: instrument.id,
+        source: isUpload ? "painting" : "physical",
+      }).catch(console.warn);
 
       // State is already DETECTING — the useEffect timer will advance to VERIFYING → DISCOVERED
     },
@@ -336,12 +404,13 @@ function ScannerContent() {
   const handleManualScan = useCallback(() => {
     if (state !== "SCANNING") return;
 
+    isUploadRef.current = false;
     const { cropped, full } = captureCameraFrame();
 
     // Convert the full frame to a blob for the API
     const frameBlob = dataUrlToBlob(full);
 
-    performDetection(frameBlob, cropped, full);
+    performDetection(frameBlob, cropped, full, false);
   }, [state, captureCameraFrame, performDetection]);
 
   // Open dedicated Search from Image interface & pause live camera
@@ -401,7 +470,8 @@ function ScannerContent() {
   const handleGetInfo = useCallback(() => {
     if (!selectedImageFile || !selectedImagePreview) return;
     setIsImageSearchActive(false);
-    performDetection(selectedImageFile, selectedImagePreview, selectedImagePreview);
+    isUploadRef.current = true;
+    performDetection(selectedImageFile, selectedImagePreview, selectedImagePreview, true);
   }, [selectedImageFile, selectedImagePreview, performDetection]);
 
   // Retry detection with the same pending frame
@@ -410,7 +480,8 @@ function ScannerContent() {
       performDetection(
         pendingFrameRef.current,
         capturedFrameUrl,
-        frozenFullFrameUrl || capturedFrameUrl
+        frozenFullFrameUrl || capturedFrameUrl,
+        isUploadRef.current
       );
     } else {
       // No pending frame — just reset to scanning
@@ -805,7 +876,11 @@ function ScannerContent() {
               (state === "DETECTING" ||
                 state === "VERIFYING" ||
                 state === "DISCOVERED") && (
-                <DetectionOverlay detection={detection} state={state} />
+                <DetectionOverlay
+                  detection={detection}
+                  state={state}
+                  imageUrl={capturedFrameUrl}
+                />
               )}
 
             {/* NOT_DETECTED Overlay — "Couldn't identify, try again" */}

@@ -5,11 +5,13 @@ import { DetectionResult, ScannerState } from "@/types/scanner";
 interface DetectionOverlayProps {
   detection: DetectionResult;
   state: ScannerState;
+  imageUrl?: string;
 }
 
 export default function DetectionOverlay({
   detection,
   state,
+  imageUrl,
 }: DetectionOverlayProps) {
   const isVerifying = state === "VERIFYING";
   const isDiscovered = state === "DISCOVERED";
@@ -18,6 +20,17 @@ export default function DetectionOverlay({
     <div className="absolute inset-0 pointer-events-none flex items-center justify-center select-none z-20">
       {/* Target Bounding Box around the sculpture / instrument */}
       <div className="relative w-[70vw] max-w-[270px] aspect-[4/5] sm:w-[300px] sm:h-[380px] transition-all duration-500 animate-fade-in">
+        {/* Render the detected instrument image inside the bounding box */}
+        {imageUrl && (
+          <div className="absolute inset-0 rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.9)] z-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl}
+              alt={detection.name}
+              className="w-full h-full object-cover filter brightness-95"
+            />
+          </div>
+        )}
         {/* Warm gold outline & glowing aura around detected object */}
         <div
           className={`absolute -inset-1 rounded-xl transition-all duration-700 pointer-events-none border-2 ${
